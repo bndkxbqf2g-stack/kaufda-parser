@@ -70,7 +70,7 @@ export function parsePrice(value) {
 }
 
 export function parseOfferCount(value) {
-  const match = normalizeText(value).match(/(?:angebote|offer(?:s)?)\s*\(\s*([\d.]+)\s*\)/i);
+  const match = normalizeText(value).match(/(?:angebote|offer(?:s)?)\s*(?:\(\s*)?([\d.]+)\s*\)?/i);
   if (!match) return null;
   const count = Number(match[1].replace(/\./g, ''));
   return Number.isFinite(count) ? count : null;
@@ -165,6 +165,18 @@ async function readKaufdaSnapshot(page) {
       if (selected.length >= 3) break;
     }
 
+    if (selected.length < 3) {
+      for (const element of document.querySelectorAll('div')) {
+        const text = (element.innerText ?? '').trim();
+        const productImage = [...element.querySelectorAll('img')].find(image => {
+          const alt = (image.alt ?? '').trim();
+          return alt.length >= 2 && !/(logo|einkaufsliste|hinzufügen|placeholder|fallback)/i.test(alt);
+        });
+        if (!productImage || !/€/.test(text) || text.length < 8 || text.length > 420) continue;
+        selected.push({ element, text, image: productImage });
+      }
+    }
+
     const unique = [];
     const seen = new Set();
     for (const item of selected) {
@@ -178,7 +190,7 @@ async function readKaufdaSnapshot(page) {
       const lines = item.text.split(/\n+/).map(line => line.trim()).filter(Boolean);
       const explicitName = item.element.querySelector(
         '[data-testid*="name"], [data-testid*="title"], [class*="offer-name"], [class*="product-name"], h2, h3, h4'
-      )?.textContent?.trim() || null;
+      )?.textContent?.trim() || item.image.alt?.trim() || null;
       const priceText = lines.find(line => /€/.test(line)) || '';
       unique.push({
         text: item.text,

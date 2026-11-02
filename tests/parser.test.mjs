@@ -19,6 +19,7 @@ test('parsePrice liest deutsche Angebotspreise', () => {
 
 test('KaufDA-Kartenzahl wird auch mit Tausenderpunkt erkannt', () => {
   assert.equal(parseOfferCount('Angebote(410)'), 410);
+  assert.equal(parseOfferCount('Angebote 410'), 410);
   assert.equal(parseOfferCount('Angebote (1.234)'), 1234);
 });
 
