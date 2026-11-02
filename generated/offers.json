@@ -4,7 +4,7 @@
     "name": "kaufda-parser",
     "version": "0.1.0"
   },
-  "fetchedAt": "2026-11-02T15:46:28.099Z",
+  "fetchedAt": "2026-11-02T15:48:46.333Z",
   "location": {
     "city": "Zellingen",
     "zip": "97225",
@@ -13,7 +13,7 @@
   },
   "summary": {
     "marketCount": 1,
-    "recognizedOfferCount": 205,
+    "recognizedOfferCount": 188,
     "targetCardCount": 410,
     "loadedCardCount": 427,
     "targetReachedCount": 1,
@@ -24,12 +24,12 @@
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "fetchedAt": "2026-11-02T15:45:32.771Z",
+      "fetchedAt": "2026-11-02T15:47:50.892Z",
       "expectedCardCount": 410,
       "loadedCardCount": 427,
       "passes": 42,
       "targetReached": true,
-      "recognizedCount": 205
+      "recognizedCount": 188
     }
   ],
   "offers": [
@@ -46,7 +46,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.824Z"
+      "fetchedAt": "2026-11-02T15:48:46.075Z"
     },
     {
       "id": "aldi-sued:geflugelfond:0.89",
@@ -61,7 +61,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.824Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:datteln:0.69",
@@ -76,22 +76,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.824Z"
-    },
-    {
-      "id": "aldi-sued:klemmbausteine-set:12.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Klemmbausteine-Set",
-      "price": 12.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/01d248d5-af18-47a4-817e-ca872517ef29/66ef42d2-3e69-4047-b4cf-c880953b2eeb.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.824Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:himbeeren:1.59",
@@ -106,7 +91,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:clementinen:1.49",
@@ -121,7 +106,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:porree:0.45",
@@ -136,7 +121,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:kaki:1.99",
@@ -151,7 +136,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:bio-zitronen:1.19",
@@ -166,7 +151,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:apfel-su-sauerlich:1.39",
@@ -181,7 +166,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:speisekartoffeln:2.29",
@@ -196,7 +181,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:grobe-bratwurst:2.29",
@@ -211,7 +196,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:schnitzel:2.99",
@@ -226,7 +211,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:filetsteak:9.49",
@@ -241,7 +226,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:koteletts:4.29",
@@ -256,7 +241,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:rinder-hackfleisch:4.59",
@@ -271,7 +256,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:hahnchensteaks:4.99",
@@ -286,7 +271,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:puten-schnitzel-wiener-art:4.99",
@@ -301,7 +286,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:chicken-burger:5.79",
@@ -316,7 +301,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:cerealien:2.79",
@@ -331,7 +316,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:genie-er-teller:1.29",
@@ -346,7 +331,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:butterkekse:1.19",
@@ -361,7 +346,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:backzutaten:0.99",
@@ -376,97 +361,67 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
-      "id": "aldi-sued:vitamin:1.39",
+      "id": "aldi-sued:farmers-origins-kaffeekapseln:2.49",
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
-      "name": "Vitamin+",
-      "price": 1.39,
-      "currency": "EUR",
-      "packSize": "1 l",
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/28b7d86a-76cd-472b-b972-384c3e16fadb/034b50eb-7beb-4243-a867-956bd50199f2.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
-    },
-    {
-      "id": "aldi-sued:deutsche-mohren:1.11",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Deutsche Möhren",
-      "price": 1.11,
+      "name": "Farmers Origins Kaffeekapseln",
+      "price": 2.49,
       "currency": "EUR",
       "packSize": "1 kg",
       "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/003fa553-6ffd-403e-b020-ca4480621ea9/cf352650-14a5-4da7-b062-57a46cd474b2.jpg?impolicy=SEO-OFFER",
+      "imageUrl": "https://content-media.bonial.biz/5db15799-7f9e-46cf-ad17-dc1d2ec617a7/391f4fa8-cf3f-4c70-8876-cc97df617417.jpg?impolicy=SEO-OFFER",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
-      "id": "aldi-sued:deutsche-rote-apfel:1.29",
+      "id": "aldi-sued:kronung:5.99",
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
-      "name": "Deutsche rote Äpfel",
-      "price": 1.29,
+      "name": "Krönung",
+      "price": 5.99,
+      "currency": "EUR",
+      "packSize": "1 kg",
+      "unitPrice": null,
+      "imageUrl": "https://content-media.bonial.biz/79ce2bde-7a1d-48b2-a710-b7930809f1a1/b06f9898-75f3-4bc9-9ab1-0916f8b14923.jpg?impolicy=SEO-OFFER",
+      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
+      "validUntil": null,
+      "category": null,
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
+    },
+    {
+      "id": "aldi-sued:frische-hahnchen-brustfilets:7.99",
+      "market": "Aldi-Sued",
+      "store": "ALDI SÜD",
+      "name": "Frische Hähnchen-Brustfilets",
+      "price": 7.99,
       "currency": "EUR",
       "packSize": null,
       "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/14de7dfd-0ad1-4f29-9a6b-352962816308/f00fdf9f-069e-4b59-8de2-f844f6d15597.jpg?impolicy=SEO-OFFER",
+      "imageUrl": "https://content-media.bonial.biz/aef5e63c-b419-4c2e-81d3-f34a98959f9d/8c083ab8-8c65-4c9b-a828-96d5703e3118.jpg?impolicy=SEO-OFFER",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
-      "id": "aldi-sued:wienerle-croissant:0.69",
+      "id": "aldi-sued:besenheide-gefarbt:1.99",
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
-      "name": "Wienerle-Croissant",
-      "price": 0.69,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/a99ba9e2-b39a-47e3-b188-d25da1ca1d52/8235cea3-76f8-4c18-a4c2-1c714036a9ec.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
-    },
-    {
-      "id": "aldi-sued:socken:1.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Socken",
+      "name": "Besenheide gefärbt",
       "price": 1.99,
       "currency": "EUR",
       "packSize": null,
       "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/ca15dd11-8834-4323-bc7b-f1b1d787df11/9b91acf3-7feb-4edd-a6c1-f1f940a6af53.jpg?impolicy=SEO-OFFER",
+      "imageUrl": "https://content-media.bonial.biz/55bee859-03ef-4bab-a35b-e6d763a8c4cb/aa994e9b-d9d9-4148-b75a-debdb2771327.jpg?impolicy=SEO-OFFER",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
-    },
-    {
-      "id": "aldi-sued:fruhkindliches-musikinstrument:14.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Frühkindliches Musikinstrument",
-      "price": 14.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/093b27d0-be0f-4485-a9c7-743236ca8722/11ebd2ec-283d-457d-87e9-bafbc1701be9.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.825Z"
+      "fetchedAt": "2026-11-02T15:48:46.076Z"
     },
     {
       "id": "aldi-sued:wiliams-edelbrand:15.99",
@@ -481,82 +436,52 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
-      "id": "aldi-sued:stilaxx-bei-reizhusten-hustenstiller:18.14",
+      "id": "aldi-sued:holz-motorikspiel:9.99",
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
-      "name": "Stilaxx® Bei Reizhusten Hustenstiller",
-      "price": 18.14,
+      "name": "Holz-Motorikspiel",
+      "price": 9.99,
       "currency": "EUR",
       "packSize": null,
       "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/6fde9c8a-f2a9-4e60-b24e-da405a80acfa/e9e3be59-8aa2-3375-b419-cdc503dea4b3.jpeg?impolicy=SEO-OFFER",
+      "imageUrl": "https://content-media.bonial.biz/7195a0f0-a528-46df-9108-30ef5c52638f/74f16d80-7c7f-42bf-8392-27a7b85c22e5.jpg?impolicy=SEO-OFFER",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
-      "id": "aldi-sued:wick-zzzquil-gute-nacht-melatonin:14.99",
+      "id": "aldi-sued:grapefruit:0.59",
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
-      "name": "WICK ZzzQuil GUTE NACHT Melatonin",
-      "price": 14.99,
+      "name": "Grapefruit",
+      "price": 0.59,
       "currency": "EUR",
       "packSize": null,
       "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/560e170c-e1bc-49a7-9d6a-072b5dc08095/f2017c6a-ec74-30ca-8022-59386b79c117.jpeg?impolicy=SEO-OFFER",
+      "imageUrl": "https://content-media.bonial.biz/e55d478e-7db3-47c6-bd29-61971737ed76/e5be8d80-ebcb-4a0a-b643-4ba3872fb104.jpg?impolicy=SEO-OFFER",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
-      "id": "aldi-sued:wala-aconit-schmerzol:17.09",
+      "id": "aldi-sued:bio-baby-spinat:0.99",
       "market": "Aldi-Sued",
       "store": "ALDI SÜD",
-      "name": "Wala® Aconit Schmerzöl",
-      "price": 17.09,
+      "name": "Bio Baby Spinat",
+      "price": 0.99,
       "currency": "EUR",
-      "packSize": null,
+      "packSize": "1 kg",
       "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/c45f56c3-c581-46e3-9352-cb29a7626879/e97a5bbd-2941-3bfa-b7db-b375759c7f78.jpeg?impolicy=SEO-OFFER",
+      "imageUrl": "https://content-media.bonial.biz/5be460ac-22a5-48ae-8afe-1ab3391ea45b/fe0b525e-3ddd-4798-8998-f769c9d31adb.jpg?impolicy=SEO-OFFER",
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
-    },
-    {
-      "id": "aldi-sued:pantoprazol-1-a-pharma-20-mg-bei-sodbrennen-magensaftresistente-tabletten:5.88",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Pantoprazol - 1 A Pharma® 20 mg bei Sodbrennen magensaftresistente Tabletten",
-      "price": 5.88,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/5502904a-e2bd-48f4-88bf-b243ccc5b718/47383449-be4b-3081-ac5d-56c5a12f9687.jpeg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
-    },
-    {
-      "id": "aldi-sued:wick-angimed-mentholgeschmack-2-mg-ml-0-5-mg-ml-spray-zur-anwendung-in-der-mundhohle:13.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "WICK AngiMed Mentholgeschmack 2 mg/ml + 0,5 mg / ml Spray zur Anwendung in der Mundhöhle",
-      "price": 13.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/173e050a-6473-47aa-93bb-d74a3c7a1d46/134dfaae-3e19-3024-8b32-4d9d7b7727a6.jpeg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:blu-ray:14.99",
@@ -571,7 +496,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:hot-wheels-adventskalender-2026:21.99",
@@ -586,7 +511,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:blueys-eisdiele:34.99",
@@ -601,7 +526,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:lebkuch-at-at:44.99",
@@ -616,7 +541,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:monopoly-mega:22.99",
@@ -631,7 +556,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:frischkasezubereitung:1.11",
@@ -646,7 +571,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:almighurt:0.29",
@@ -661,7 +586,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:pflegespulung:4.99",
@@ -676,7 +601,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:fruchtgummi:0.99",
@@ -691,7 +616,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:coca-cola:1.19",
@@ -706,7 +631,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:saltletts:1.11",
@@ -721,7 +646,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:slipeinlagen:2.22",
@@ -736,7 +661,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:pizza:1.66",
@@ -751,7 +676,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:feiner-weichkase:1.79",
@@ -766,7 +691,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.077Z"
     },
     {
       "id": "aldi-sued:bio-honig:2.89",
@@ -781,7 +706,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:schmelzkase:0.99",
@@ -796,7 +721,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:apfelmus:0.89",
@@ -811,7 +736,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:kaffee-pads:1.89",
@@ -826,7 +751,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.826Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:h-schoko-drink:0.69",
@@ -841,7 +766,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:meerrettich:0.89",
@@ -856,7 +781,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:passierte-tomaten:0.45",
@@ -871,7 +796,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:eismeer-garnelen:1.69",
@@ -886,7 +811,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:cookeo:0.69",
@@ -901,7 +826,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:eierspatzle:1.29",
@@ -916,7 +841,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:hunde-nassfutter:0.35",
@@ -931,7 +856,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:kartoffelknodel:1.29",
@@ -946,7 +871,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:bio-kapern:2.19",
@@ -961,7 +886,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:hafermast-gansebrust-mit-knochen:17.99",
@@ -976,7 +901,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.827Z"
+      "fetchedAt": "2026-11-02T15:48:46.078Z"
     },
     {
       "id": "aldi-sued:hafermast-gansekeulen:17.59",
@@ -991,7 +916,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.081Z"
     },
     {
       "id": "aldi-sued:hirsch-edelgulasch:8.49",
@@ -1006,7 +931,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.081Z"
     },
     {
       "id": "aldi-sued:rosti-sterne:1.49",
@@ -1021,7 +946,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:maronen:2.69",
@@ -1036,7 +961,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:wildlachsfilet-im-blatterteig:1.99",
@@ -1051,7 +976,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:filoncino:1.49",
@@ -1066,7 +991,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:eis-dessert:1.99",
@@ -1081,7 +1006,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:gruner-veltliner-freundeskreis:2.69",
@@ -1096,7 +1021,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:fond:0.89",
@@ -1111,7 +1036,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:riesengarnelen:4.89",
@@ -1126,7 +1051,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:ski-unterwasche:9.99",
@@ -1141,7 +1066,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:schneestiefel:12.99",
@@ -1156,22 +1081,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
-    },
-    {
-      "id": "aldi-sued:winter-handschuhe-oder-faustlinge:4.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Winter-Handschuhe oder Fäustlinge",
-      "price": 4.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/1aecab1a-367a-4a1d-b46f-391387a88560/fb084069-7ac2-45c3-8599-f4472c4cc178.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:thermostiefel:7.99",
@@ -1186,7 +1096,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:ski-fleece-pullover:3.99",
@@ -1201,7 +1111,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:winter-overall:9.99",
@@ -1216,7 +1126,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:adventskalender-box:3.99",
@@ -1231,7 +1141,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:weihnachts-puzzle:4.99",
@@ -1246,7 +1156,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:robo-alive-oder-pets-alive:6.99",
@@ -1261,7 +1171,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:weihnachts-pluschfigur:1.99",
@@ -1276,7 +1186,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:duftkerze-im-glas:5.99",
@@ -1291,7 +1201,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:luftbett:19.99",
@@ -1306,7 +1216,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:winterjersey-bettwasche-standard-gro-e:24.99",
@@ -1321,7 +1231,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.831Z"
+      "fetchedAt": "2026-11-02T15:48:46.082Z"
     },
     {
       "id": "aldi-sued:winterjersey-spannbetttuch:12.99",
@@ -1336,7 +1246,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:wohndecke:14.99",
@@ -1351,7 +1261,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:kunstfell-teppich:9.99",
@@ -1366,22 +1276,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
-    },
-    {
-      "id": "aldi-sued:teppich-und-polsterreiniger:49.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Teppich- und Polsterreiniger",
-      "price": 49.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/21760e0d-038a-4e7d-a5fd-223b274e6d4c/de369879-8ac8-415b-b4e2-281e63046751.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:frotier-set:12.99",
@@ -1396,7 +1291,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:winter-gesteck:9.99",
@@ -1411,7 +1306,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:badematte:6.99",
@@ -1426,7 +1321,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:weihnachts-geschenkpapier:0.99",
@@ -1441,7 +1336,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:weihnachts-karten:0.99",
@@ -1456,52 +1351,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
-    },
-    {
-      "id": "aldi-sued:batterien:1.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Batterien",
-      "price": 1.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/3102851f-b6bd-44ce-bfbf-41d3c2343b11/26fd6845-7b50-4d8a-81d5-dfac91cd2718.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
-    },
-    {
-      "id": "aldi-sued:geschenkverpackung-oder-deko:0.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Geschenkverpackung oder -Deko",
-      "price": 0.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/1754aaa6-5e7e-4098-a247-46c546797f49/a589941b-5b41-4a1a-a1a2-cf0850b435c6.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
-    },
-    {
-      "id": "aldi-sued:weihnachts-servietten:0.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Weihnachts-Servietten",
-      "price": 0.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/321ee4cf-d774-4290-ada9-6bb656b76277/91a5e9ea-a1cc-4f3c-ad42-03b7e86bf11b.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:premium-geschenktaschen:1.49",
@@ -1516,7 +1366,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:tesafilm:1.99",
@@ -1531,7 +1381,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:weihnachts-geschenkband:0.99",
@@ -1546,7 +1396,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:3d-leuchtstern:7.99",
@@ -1561,7 +1411,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.838Z"
+      "fetchedAt": "2026-11-02T15:48:46.087Z"
     },
     {
       "id": "aldi-sued:verlangerungskabel:3.99",
@@ -1576,7 +1426,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.842Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:duftkerze-im-glas:1.99",
@@ -1591,7 +1441,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.842Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:adventskerzen:3.99",
@@ -1606,7 +1456,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.842Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:weihnachts-fu-matte:3.99",
@@ -1621,7 +1471,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:krauter:1.49",
@@ -1636,7 +1486,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:amaryllis-in-wachs:4.99",
@@ -1651,7 +1501,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:geschmuckte-zuckerhutfichte:9.99",
@@ -1666,7 +1516,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:orchidee:6.99",
@@ -1681,7 +1531,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:flammen-aroma-diffuser:14.99",
@@ -1696,7 +1546,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:mobiler-warmespender:17.99",
@@ -1711,37 +1561,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
-    },
-    {
-      "id": "aldi-sued:winter-laufschuhe:17.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Winter-Laufschuhe",
-      "price": 17.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/d2e55dc3-c109-4a8e-b06d-71a650a0eb46/7e06f7ad-3698-4d56-8991-fe8e178533e0.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
-    },
-    {
-      "id": "aldi-sued:outdoor-schuhe:17.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Outdoor-Schuhe",
-      "price": 17.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/4b71a0fe-2b3c-488e-8e9a-b753bb4e2df6/f69a5d9c-0e32-4b3e-8738-a9022f1ab96d.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:socken:3.99",
@@ -1756,7 +1576,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:thermo-scheibenschutz:2.99",
@@ -1771,7 +1591,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:jeans:11.99",
@@ -1786,7 +1606,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:outdoor-fleecejacke:5.99",
@@ -1801,7 +1621,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:unterzieh-shirts:4.99",
@@ -1816,7 +1636,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:milchreis:0.39",
@@ -1831,7 +1651,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:smoothie:3.49",
@@ -1846,7 +1666,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:kase-scheiben:1.79",
@@ -1861,7 +1681,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.843Z"
+      "fetchedAt": "2026-11-02T15:48:46.091Z"
     },
     {
       "id": "aldi-sued:extra-weniger-zucker-oder-zero:1.99",
@@ -1876,7 +1696,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:meersalz-butter:2.49",
@@ -1891,7 +1711,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:grana-padano:3.99",
@@ -1906,7 +1726,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:finello-mozzarella:1.29",
@@ -1921,7 +1741,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:flow:1.29",
@@ -1936,7 +1756,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:ayran:0.79",
@@ -1951,7 +1771,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:ganze-bohne-oder-filterkaffee:4.49",
@@ -1966,7 +1786,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:red-label-oder-red-soul:10.99",
@@ -1981,7 +1801,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:hulsenfruchte:1.29",
@@ -1996,7 +1816,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:gewurze-im-nachfullbeutel:1.79",
@@ -2011,7 +1831,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:risotto-reis:1.49",
@@ -2026,7 +1846,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:feine-cornichons:0.89",
@@ -2041,7 +1861,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:bio-bourbon-vanilleschoten:1.99",
@@ -2056,7 +1876,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:lachsfilet:2.29",
@@ -2071,7 +1891,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:griechisches-natives-olivenol-extra:6.99",
@@ -2086,7 +1906,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:getrocknete-pilze:3.99",
@@ -2101,7 +1921,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:original-griechische-pfefferonen:0.99",
@@ -2116,7 +1936,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.099Z"
     },
     {
       "id": "aldi-sued:pfeffermuhle:4.99",
@@ -2131,7 +1951,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:kochbeutel-original-langkorn-reis:2.49",
@@ -2146,7 +1966,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:saftige-kokostortchen:1.99",
@@ -2161,7 +1981,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:gansebrustfilet:9.99",
@@ -2176,7 +1996,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:minis:1.79",
@@ -2191,7 +2011,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:prinzen-rolle:1.59",
@@ -2206,7 +2026,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:kinder-schokolade:2.29",
@@ -2221,7 +2041,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.851Z"
+      "fetchedAt": "2026-11-02T15:48:46.100Z"
     },
     {
       "id": "aldi-sued:knopfle:1.49",
@@ -2236,7 +2056,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:kunterbunt:1.49",
@@ -2251,7 +2071,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:nussknacker:1.19",
@@ -2266,7 +2086,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:suprema:3.99",
@@ -2281,7 +2101,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:murbegeback:1.99",
@@ -2296,7 +2116,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:comtess:1.69",
@@ -2311,7 +2131,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:koch-hinterschinken:1.49",
@@ -2326,7 +2146,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:gulasch:4.99",
@@ -2341,7 +2161,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:pasta-so-e:2.49",
@@ -2356,7 +2176,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:landertee:2.49",
@@ -2371,7 +2191,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:puten-miniflets:9.99",
@@ -2386,7 +2206,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:lachsfilet-portionen:15.99",
@@ -2401,7 +2221,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:hahnchen-brustfilet-teilstucke:12.99",
@@ -2416,7 +2236,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:monte-maxi:1.49",
@@ -2431,7 +2251,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:rouladen:14.99",
@@ -2446,7 +2266,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:pepsi-oder-schwip-schwap:1.19",
@@ -2461,7 +2281,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:rocher:1.79",
@@ -2476,37 +2296,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
-    },
-    {
-      "id": "aldi-sued:katzen-snack:5.45",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Katzen-Snack",
-      "price": 5.45,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/61972983-a8a3-4b0e-8e3b-dc45d94aed12/c4905886-5b01-4615-b62a-8e41f051f0fb.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
-    },
-    {
-      "id": "aldi-sued:handgeschirrspulmittel:2.75",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Handgeschirrspülmittel",
-      "price": 2.75,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/fc62a877-6a81-4762-8c3d-22c74a6d2298/f2c8dc5c-d478-4cdb-b056-0efe3f81b2f1.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:slip-einlagen:4.99",
@@ -2521,7 +2311,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:milch-mause:3.29",
@@ -2536,7 +2326,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:crunchips:1.79",
@@ -2551,37 +2341,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
-    },
-    {
-      "id": "aldi-sued:katzen-nassfutter:22.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Katzen-Nassfutter",
-      "price": 22.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/fdb98589-a035-4a55-b3ae-34b169183197/9fdfd8b1-6f79-433a-a53e-01c76ef472a1.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.857Z"
-    },
-    {
-      "id": "aldi-sued:toilettenpapier:7.99",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Toilettenpapier",
-      "price": 7.99,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/e425a29e-0b45-4d82-b6bc-75c1575eaae9/9da8136c-178e-42d6-b9c3-e6807d056d41.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.107Z"
     },
     {
       "id": "aldi-sued:ski-jacke:12.99",
@@ -2596,7 +2356,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:schneeanzug:9.99",
@@ -2611,7 +2371,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:ski-hose:9.99",
@@ -2626,7 +2386,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:zitronat-oder-orangeat:0.79",
@@ -2641,7 +2401,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:mandeln-gehackt:1.25",
@@ -2656,7 +2416,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:haselnusskerne:2.99",
@@ -2671,7 +2431,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:vanillin-zucker:0.39",
@@ -2686,7 +2446,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:kokos:1.19",
@@ -2701,7 +2461,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:mandeln:2.49",
@@ -2716,7 +2476,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:raspelschokolade:1.59",
@@ -2731,7 +2491,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:milch-schokoladenstreusel:2.99",
@@ -2746,7 +2506,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:backoblaten:0.99",
@@ -2761,7 +2521,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:feine-marzipan-rohmasse:1.89",
@@ -2776,22 +2536,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
-    },
-    {
-      "id": "aldi-sued:zucker-streudekor:0.89",
-      "market": "Aldi-Sued",
-      "store": "ALDI SÜD",
-      "name": "Zucker-Streudekor",
-      "price": 0.89,
-      "currency": "EUR",
-      "packSize": null,
-      "unitPrice": null,
-      "imageUrl": "https://content-media.bonial.biz/eca0e5d0-35cf-4d37-9ee3-85409983166d/ec0405f1-beb6-4143-b341-c92d687a142e.jpg?impolicy=SEO-OFFER",
-      "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "validUntil": null,
-      "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:schoko-tropfchen-oder-chunks:1.59",
@@ -2806,7 +2551,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:kuverture-wei:1.99",
@@ -2821,7 +2566,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:zimt:0.99",
@@ -2836,7 +2581,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:frischkase:1.59",
@@ -2851,7 +2596,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:joghurt:0.89",
@@ -2866,7 +2611,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:schmelzkasescheiben:1.49",
@@ -2881,7 +2626,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.869Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:joghurt:0.79",
@@ -2896,7 +2641,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.870Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:joghurt:1.79",
@@ -2911,7 +2656,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.870Z"
+      "fetchedAt": "2026-11-02T15:48:46.118Z"
     },
     {
       "id": "aldi-sued:premium-joghurt:0.49",
@@ -2926,7 +2671,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:creme-a-la-cuisine:0.89",
@@ -2941,7 +2686,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:reine-buttermilch:0.59",
@@ -2956,7 +2701,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:kase-aufschnitt:1.89",
@@ -2971,7 +2716,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:ayran:0.49",
@@ -2986,7 +2731,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:creme-fraiche-oder-leicht:0.99",
@@ -3001,7 +2746,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:emmentaler:1.79",
@@ -3016,7 +2761,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:schmand:0.79",
@@ -3031,7 +2776,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:mozzarella:1.79",
@@ -3046,7 +2791,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:ostsee:49",
@@ -3061,7 +2806,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:norwegen:969",
@@ -3076,7 +2821,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:island-schottland:799",
@@ -3091,7 +2836,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     },
     {
       "id": "aldi-sued:stadtetrip-fur-alle:49",
@@ -3106,7 +2851,7 @@
       "sourceUrl": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "validUntil": null,
       "category": null,
-      "fetchedAt": "2026-11-02T15:46:27.883Z"
+      "fetchedAt": "2026-11-02T15:48:46.130Z"
     }
   ]
 }
