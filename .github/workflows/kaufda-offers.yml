@@ -25,6 +25,8 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
+      - name: Leere Ergebnisse blockieren
+        run: node -e "const d=require('./generated/offers.json'); if (!d.summary?.recognizedOfferCount) { throw new Error('Keine Lebensmittelangebote erkannt; bestehende Daten werden nicht überschrieben.') }"
       - name: Änderungen veröffentlichen
         run: |
           git config user.name 'github-actions[bot]'

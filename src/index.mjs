@@ -255,7 +255,12 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
       const startedAt = new Date().toISOString();
       try {
         await page.goto(market.url, { waitUntil: 'domcontentloaded', timeout: 90000 });
-        await page.waitForTimeout(market.initialWaitMs ?? 2500);
+        await page.waitForTimeout(market.initialWaitMs ?? 3500);
+        const offersTab = page.getByRole('button', { name: /Angebote/i }).first();
+        if (await offersTab.count()) {
+          await offersTab.click().catch(() => {});
+          await page.waitForTimeout(market.afterOffersTabWaitMs ?? 2500);
+        }
         const scan = await collectOffersFromPage(page, market, config);
         results.push({
           market: market.key ?? market.store,
