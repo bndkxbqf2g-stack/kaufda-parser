@@ -268,7 +268,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
       try {
         await page.goto(market.url, { waitUntil: 'domcontentloaded', timeout: 90000 });
         await page.waitForTimeout(market.initialWaitMs ?? 3500);
-        const offersTab = page.getByRole('button', { name: /Angebote/i }).first();
+        const offersTab = page.getByRole('button', { name: /^Angebote\s*(?:\(|\d)/i }).first();
         if (await offersTab.count()) {
           await offersTab.click().catch(() => {});
           await page.waitForTimeout(market.afterOffersTabWaitMs ?? 2500);
