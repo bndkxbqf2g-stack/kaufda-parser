@@ -23,7 +23,8 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
+      # GitHub-Hosted Ubuntu enthält die benötigten Browser-Bibliotheken bereits.
+      - run: npx playwright install chromium
       - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
       - name: Leere Ergebnisse blockieren
         run: node -e "const d=require('./generated/offers.json'); if (!d.summary?.recognizedOfferCount) { throw new Error('Keine Lebensmittelangebote erkannt; bestehende Daten werden nicht überschrieben.') }"
