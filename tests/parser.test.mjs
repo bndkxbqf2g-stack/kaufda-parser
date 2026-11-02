@@ -30,6 +30,7 @@ test('Datum wird in ISO-Format überführt', () => {
 test('Nichtlebensmittel werden herausgefiltert', () => {
   assert.equal(isLikelyFood('Salami', mergeConfig()), true);
   assert.equal(isLikelyFood('LED-Papierlicht', mergeConfig()), false);
+  assert.equal(isLikelyFood('Klemmbausteine-Set', mergeConfig({ excludeTerms: ['Wein'] })), false);
   assert.equal(isLikelyFood('LED-Papierlicht', { foodOnly: false }), true);
 });
 

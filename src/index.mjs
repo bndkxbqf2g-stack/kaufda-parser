@@ -40,7 +40,10 @@ export function mergeConfig(input = {}) {
     location: { ...DEFAULT_CONFIG.location, ...(input.location ?? {}) },
     scroll: { ...DEFAULT_CONFIG.scroll, ...(input.scroll ?? {}) },
     output: { ...DEFAULT_CONFIG.output, ...(input.output ?? {}) },
-    excludeTerms: Array.isArray(input.excludeTerms) ? input.excludeTerms : DEFAULT_EXCLUDE_TERMS,
+    excludeTerms: [...new Set([
+      ...DEFAULT_EXCLUDE_TERMS,
+      ...(Array.isArray(input.excludeTerms) ? input.excludeTerms : [])
+    ])],
     markets: Array.isArray(input.markets) ? input.markets : []
   };
 }
