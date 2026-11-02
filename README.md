@@ -51,7 +51,10 @@ Für die sichtbare Fehlersuche kann `--headed` ergänzt werden. Ein einzelner Ma
 - Er übernimmt nur Karten mit erkanntem Namen und Preis.
 - Nichtlebensmittel werden über `excludeTerms` entfernt; die Liste kann pro Projekt angepasst werden.
 - Pro Angebot werden Bezeichnung, Preis, Packungsgröße, Bild-URL, Quelle, Markt und Gültigkeitsdatum gespeichert.
+- Logo-, Platzhalter- und Fallback-Bilder werden nicht als Produktbild übernommen.
 - `targetCardCount`, `loadedCardCount`, `targetReached` und `recognizedCount` stehen zusätzlich in der Marktzusammenfassung.
+
+Mit `includeTerms` kann ein Projekt zusätzlich eine eigene Produktgruppe über Suchbegriffe einschränken. `excludeTerms` bleibt der sichere Ausschlussfilter für Nichtlebensmittel.
 
 Die Bilder werden nicht kopiert, sondern über die von KaufDA gelieferte Bild-URL referenziert. Falls KaufDA das HTML oder die Kartenstruktur ändert, bleibt der manuelle Import als Fallback in der jeweiligen App sinnvoll; der Parser meldet dann einen unvollständigen Lauf statt falsche Vollständigkeit vorzutäuschen.
 

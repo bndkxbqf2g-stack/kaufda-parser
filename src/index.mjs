@@ -85,10 +85,11 @@ export function parseDate(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
 
-export function isLikelyFood(name, { foodOnly = true, excludeTerms = DEFAULT_EXCLUDE_TERMS } = {}, context = '') {
+export function isLikelyFood(name, { foodOnly = true, excludeTerms = DEFAULT_EXCLUDE_TERMS, includeTerms = [] } = {}, context = '') {
   if (!foodOnly) return true;
   const text = `${name} ${context}`.toLocaleLowerCase('de-DE');
-  return !excludeTerms.some(term => text.includes(String(term).toLocaleLowerCase('de-DE')));
+  if (excludeTerms.some(term => text.includes(String(term).toLocaleLowerCase('de-DE')))) return false;
+  return !includeTerms.length || includeTerms.some(term => text.includes(String(term).toLocaleLowerCase('de-DE')));
 }
 
 function extractPackSize(text) {
@@ -111,7 +112,8 @@ export function normalizeOffer(raw, market, config = {}) {
   const price = raw.price ?? parsePrice(raw.priceText ?? text);
   const name = chooseName(lines, raw.name);
   if (!name || price == null) return null;
-  if (!isLikelyFood(name, config, text)) return null;
+  const filterConfig = { ...config, includeTerms: market.includeTerms ?? config.includeTerms ?? [] };
+  if (!isLikelyFood(name, filterConfig, text)) return null;
   if (Number.isFinite(config.maxPrice) && price > config.maxPrice) return null;
 
   const imageUrl = raw.imageUrl ?? raw.image ?? null;
@@ -166,7 +168,10 @@ async function readKaufdaSnapshot(page) {
     const unique = [];
     const seen = new Set();
     for (const item of selected) {
-      const imageUrl = item.image.currentSrc || item.image.src || item.image.getAttribute('data-src') || null;
+      const candidateImageUrl = item.image.currentSrc || item.image.src || item.image.getAttribute('data-src') || null;
+      const imageUrl = candidateImageUrl && !/(kaufda|logo|placeholder|fallback)/i.test(candidateImageUrl)
+        ? candidateImageUrl
+        : null;
       const key = `${item.text}|${imageUrl}`;
       if (seen.has(key)) continue;
       seen.add(key);
