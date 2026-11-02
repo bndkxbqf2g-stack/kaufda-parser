@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "locale": "de-DE",
+  "location": {
+    "city": "Zellingen",
+    "zip": "97225",
+    "lat": 49.9016992,
+    "lng": 9.812895
+  },
+  "markets": [
+    {
+      "key": "Aldi-Sued",
+      "store": "ALDI SÜD",
+      "url": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
+      "productGroups": ["food"]
+    },
+    {
+      "key": "Lidl-Zellingen",
+      "store": "Lidl",
+      "url": "",
+      "productGroups": ["food"]
+    }
+  ],
+  "foodOnly": true,
+  "excludeTerms": [
+    "LED", "Arznei", "Shampoo", "Waschmittel", "Tierfutter", "Spielzeug",
+    "Werkzeug", "Pflanze", "Wein", "Bier", "Sekt", "Spirituose"
+  ],
+  "maxPrice": null,
+  "scroll": {
+    "delayMs": 1100,
+    "stepPx": 520,
+    "maxPasses": 420,
+    "stablePassesAtEnd": 5
+  },
+  "output": {
+    "directory": "generated",
+    "file": "offers.json"
+  }
+}
+

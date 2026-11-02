@@ -1,0 +1,35 @@
+name: KaufDA-Angebote aktualisieren
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Montag und Donnerstag, 05:15 UTC. Die Tage können angepasst werden.
+    - cron: '15 5 * * 1,4'
+  push:
+    paths:
+      - 'kaufda-parser.config.json'
+      - 'src/**'
+      - '.github/workflows/kaufda-offers.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-offers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
+      - name: Änderungen veröffentlichen
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add generated/offers.json
+          git diff --cached --quiet || git commit -m 'chore: KaufDA-Angebote aktualisieren'
+          git push
+

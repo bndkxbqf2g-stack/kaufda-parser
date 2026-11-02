@@ -1,0 +1,23 @@
+{
+  "name": "kaufda-parser",
+  "version": "0.1.0",
+  "description": "Konfigurierbarer KaufDA-Browserparser für Lebensmittelangebote.",
+  "type": "module",
+  "bin": {
+    "kaufda-parser": "./src/cli.mjs"
+  },
+  "scripts": {
+    "parse": "node ./src/cli.mjs parse",
+    "init": "node ./src/cli.mjs init",
+    "validate": "node ./src/cli.mjs validate",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  },
+  "license": "MIT"
+}
+
