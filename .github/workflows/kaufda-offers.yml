@@ -3,13 +3,21 @@ name: KaufDA-Angebote aktualisieren
 on:
   workflow_dispatch:
   schedule:
-    # Montag und Donnerstag, 05:15 UTC. Die Tage können angepasst werden.
-    - cron: '15 5 * * 1,4'
+    # Täglich 05:15 UTC. Der Lauf bleibt begrenzt und veröffentlicht den
+    # Vollständigkeitsstatus zusammen mit den Angeboten.
+    - cron: '15 5 * * *'
   push:
     paths:
       - 'kaufda-parser.config.json'
       - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/kaufda-offers.yml'
+
+concurrency:
+  group: kaufda-offers
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -17,17 +25,25 @@ permissions:
 jobs:
   update-offers:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
-      # GitHub-Hosted Ubuntu enthält die benötigten Browser-Bibliotheken bereits.
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
       - run: npx playwright install chromium
-      - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
-      - name: Leere Ergebnisse blockieren
-        run: node -e "const d=require('./generated/offers.json'); if (!d.summary?.recognizedOfferCount) { throw new Error('Keine Lebensmittelangebote erkannt; bestehende Daten werden nicht überschrieben.') }"
+      - name: KaufDA-Angebote begrenzt erfassen
+        run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.next.json
+      - name: Ergebnis prüfen
+        run: node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.next.json
+      - name: Ergebnis veröffentlichen
+        run: mv generated/offers.next.json generated/offers.json
+      - name: Laufdaten ausgeben
+        run: node -e "const d=require('./generated/offers.json'); console.log(JSON.stringify(d.summary, null, 2));"
+      - name: Diff prüfen
+        run: git diff --check
       - name: Änderungen veröffentlichen
         run: |
           git config user.name 'github-actions[bot]'
