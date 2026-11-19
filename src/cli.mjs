@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { DEFAULT_CONFIG, loadConfig, mergeConfig, runParser, validateConfig } from './index.mjs';
+import { loadConfig, mergeConfig, runParser, validateConfig, validateOutputDocument } from './index.mjs';
 
 function args(argv) {
   const result = { _: [] };
@@ -18,17 +18,19 @@ function args(argv) {
 }
 
 function help() {
-  console.log(`kaufda-parser ${'0.1.0'}
+  console.log(`kaufda-parser ${'0.2.0'}
 
 Befehle:
   init      Beispielkonfiguration und GitHub-Action anlegen
   validate  Konfiguration prüfen
   parse     KaufDA-Seiten öffnen, Angebote laden und JSON schreiben
+  verify    Angebotsdatei auf sichere Veröffentlichung prüfen
 
 Beispiele:
   node src/cli.mjs init --city Zellingen --zip 97225
   node src/cli.mjs validate --config kaufda-parser.config.json
   node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
+  node src/cli.mjs verify --input generated/offers.json
   node src/cli.mjs parse --market Aldi-Sued --headed
 `);
 }
@@ -50,13 +52,20 @@ const actionWorkflow = `name: KaufDA-Angebote aktualisieren
 on:
   workflow_dispatch:
   schedule:
-    # Montag und Donnerstag, 05:15 UTC. Die Tage können angepasst werden.
-    - cron: '15 5 * * 1,4'
+    # Täglich 05:15 UTC.
+    - cron: '15 5 * * *'
   push:
     paths:
       - 'kaufda-parser.config.json'
       - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/kaufda-offers.yml'
+
+concurrency:
+  group: kaufda-offers
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -64,14 +73,19 @@ permissions:
 jobs:
   update-offers:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
-      - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npx playwright install chromium
+      - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.next.json
+      - run: node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.next.json
+      - run: mv generated/offers.next.json generated/offers.json
+      - run: git diff --check
       - name: Änderungen veröffentlichen
         run: |
           git config user.name 'github-actions[bot]'
@@ -115,6 +129,19 @@ async function main() {
     console.log(`Konfiguration gültig: ${config.markets.length} Markt/ Märkte.`);
     return;
   }
+  if (command === 'verify') {
+    const inputPath = options.input ?? path.join(config.output.directory, config.output.file);
+    const document = JSON.parse(await fs.readFile(inputPath, 'utf8'));
+    const result = validateOutputDocument(document);
+    result.warnings.forEach((warning) => console.warn(`Warnung: ${warning}`));
+    if (!result.valid) {
+      console.error(result.errors.join('\n'));
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`Angebotsdatei veröffentlichbar: ${document.summary.foodOfferCount} Lebensmittelangebote.`);
+    return;
+  }
   if (command !== 'parse') return help();
   if (!check.valid) throw new Error(check.errors.join('; '));
 
@@ -132,4 +159,5 @@ main().catch(error => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });
+
 
