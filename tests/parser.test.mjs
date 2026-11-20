@@ -97,6 +97,19 @@ test('sichtbare Regelpreise und Packungsbeschreibung werden übernommen', () => 
   assert.equal(offer.offer.packSize, '500-g-Packung');
   assert.equal(offer.offer.unitPrice, 1.78);
   assert.equal(offer.offer.validUntil, '2026-11-21');
+  assert.equal(offer.offer.planningStatus, 'ready');
+});
+
+test('Packung und Angebotspreis reichen für die Rezeptplanung ohne Grundpreis oder Gültigkeit', () => {
+  const offer = assessOffer({
+    name: 'Bio-Mandeldrink',
+    text: 'Bio-Mandeldrink\n1,35 €\n1 l'
+  }, market, mergeConfig(), '2026-11-20T07:00:00Z');
+  assert.equal(offer.state, 'accepted');
+  assert.equal(offer.offer.status, 'verified');
+  assert.equal(offer.offer.planningStatus, 'ready');
+  assert.equal(offer.offer.unitPrice, null);
+  assert.equal(offer.offer.validUntil, null);
 });
 
 test('Lebensmittelklassifikation unterscheidet sicher, unsicher und Nichtlebensmittel', () => {
@@ -166,6 +179,8 @@ test('Dokument trennt Karten, erkannte Angebote, Lebensmittel und Prüfstatus', 
   assert.equal(document.contractVersion, 'vorratskompass-offers/v1');
   assert.equal(document.summary.recognizedOfferCount, 4);
   assert.equal(document.summary.foodOfferCount, 1);
+  assert.equal(document.summary.planningReadyOfferCount, 1);
+  assert.equal(document.summary.planningCompletenessStatus, 'complete');
   assert.equal(document.summary.uncertainCount, 1);
   assert.equal(document.summary.targetReachedCount, 1);
   assert.equal(document.summary.completenessStatus, 'complete');

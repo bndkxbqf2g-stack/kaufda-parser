@@ -421,10 +421,14 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     };
   }
 
-  const complete = Boolean(
-    name && Number.isFinite(price) && pack.text && Number.isFinite(unit.amount)
-    && validUntil && validUrl(sourceUrl) && classification.confidence === 'high'
+  // Für die Rezept- und Einkaufsplanung sind Produkt, aktueller Angebotspreis
+  // und Packungs-/Mengenangabe die Pflichtangaben. Grundpreis und Gültigkeit
+  // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
+  const planningReady = Boolean(
+    name && Number.isFinite(price) && pack.text && validUrl(sourceUrl)
+    && classification.label === 'food' && classification.confidence === 'high'
   );
+  const complete = planningReady;
   const offer = {
     id: assessmentId(raw, market, name, price, pack.text, validUntil),
     market: marketLabel(market),
@@ -438,6 +442,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     discountAmount: priceDetails.discountAmount,
     priceType: priceDetails.type,
     priceEvidence: priceDetails,
+    planningStatus: planningReady ? 'ready' : 'needs-review',
     currency: raw.currency ?? 'EUR',
     packSize: pack.text,
     pack: pack.text,
@@ -797,7 +802,10 @@ export function buildOffersDocument({ config: configInput, results = [], offers 
     targetReachedCount: results.filter((result) => result.targetReached === true).length,
     incompleteMarketCount,
     errorCount,
-    completenessStatus: errorCount === marketCount || !marketCount ? 'failed' : incompleteMarketCount ? 'incomplete' : 'complete'
+    completenessStatus: errorCount === marketCount || !marketCount ? 'failed' : incompleteMarketCount ? 'incomplete' : 'complete',
+    planningReadyOfferCount: normalizedOffers.filter((offer) => offer.planningStatus === 'ready').length,
+    planningReviewOfferCount: normalizedOffers.filter((offer) => offer.planningStatus !== 'ready').length,
+    planningCompletenessStatus: normalizedOffers.length && normalizedOffers.every((offer) => offer.planningStatus === 'ready') ? 'complete' : normalizedOffers.length ? 'partial' : 'empty'
   };
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -836,5 +844,8 @@ export function validateOutputDocument(document) {
   if (!document || !Array.isArray(document.offers) || !Array.isArray(document.markets)) errors.push('Angebotsdokument ist unvollständig.');
   if (!Number.isFinite(summary.foodOfferCount) || summary.foodOfferCount < 1) errors.push('Keine Lebensmittelangebote erkannt.');
   if (summary.completenessStatus === 'failed') errors.push('Alle Märkte sind fehlgeschlagen.');
-  return { valid: errors.length === 0, errors, warnings: summary.completenessStatus === 'incomplete' ? ['Mindestens ein Markt ist unvollständig; Daten bleiben sichtbar, werden aber nicht als vollständig markiert.'] : [] };
+  const warnings = [];
+  if (summary.completenessStatus === 'incomplete') warnings.push('Marktabdeckung ist unvollständig; planungsbereite Angebote bleiben trotzdem nutzbar.');
+  if (summary.planningCompletenessStatus === 'partial') warnings.push('Ein Teil der Angebote benötigt noch eine Mengen-/Packungsprüfung.');
+  return { valid: errors.length === 0, errors, warnings };
 }

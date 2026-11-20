@@ -42,13 +42,14 @@ Jedes übernommene Lebensmittelangebot enthält weiterhin flache, leicht importi
 
 - `fieldStatus`: getrennt sichtbare oder fehlende Werte für Produkt, Preis, Packung, Grundpreis, Gültigkeit und Quelle;
 - `classification`: `food`, `nonfood` oder `uncertain` mit Gründen und Merkmalen;
-- `status`/`reviewStatus`: `verified` nur bei vollständigen, sichtbaren Pflichtfeldern, sonst `needs-review`;
+- `status`/`reviewStatus`: `verified` sobald Produkt, aktueller Angebotspreis und Packungs-/Mengenangabe für die Planung vorliegen; Grundpreis und Gültigkeit bleiben separat sichtbar;
 - `rawText`: begrenzter Rohtext der sichtbaren Karte, damit Korrekturen möglich bleiben;
 - `capturedAt`, `fetchedAt`, Markt, Quelle und Gültigkeitszeitraum;
 - `marketLocationStatus` sowie der Marktstatus mit sichtbarer Adresse, damit falsch aufgelöste KaufDA-Orte nicht in den PWA-Feed gelangen;
 - stabile IDs, die Markt, Quelle, Produkt, Preis, Packungsgröße und Gültigkeit berücksichtigen.
 - Preiszeilen werden semantisch getrennt: `price` ist der aktuelle Angebotspreis, `discountAmount` ein sichtbarer „sparen!“-Betrag und `basePrice`/`previousPrice` der durchgestrichene Regelpreis. Sternchen und Darstellungshinweise werden ignoriert.
-- `priceType` und `priceEvidence` dokumentieren, ob ein Regelpreis oder Rabatt sichtbar war. Relative Hinweise wie „Endet morgen“ werden anhand von `capturedAt` in ein absolutes `validUntil` überführt, damit abgelaufene Angebote aus der aktiven Planung fallen können.
+- `priceType` und `priceEvidence` dokumentieren, ob ein Regelpreis oder Rabatt sichtbar war. Ein Angebot gilt für die Planung als vollständig, sobald Produkt, aktueller Angebotspreis und Packungs-/Mengenangabe erkannt wurden; Grundpreis und Gültigkeit sind Zusatzdaten.
+- Relative Hinweise wie „Endet morgen“ werden anhand von `capturedAt` in ein absolutes `validUntil` überführt. Nach Ablauf fällt der Aktionspreis aus der aktiven Planung; ein gespeicherter durchgestrichener regulärer Preis bleibt als Normalpreis erhalten.
 
 Nichtlebensmittel und unklare Karten werden nicht als Lebensmittelangebote ausgegeben. Sie erscheinen stattdessen in `reviewItems` und in den Markt-Zählungen. Die Zusammenfassung unterscheidet ausdrücklich:
 
@@ -74,7 +75,7 @@ Ein begrenzter Live-Lauf der sichtbaren öffentlichen Seiten wurde am `2026-11-1
 | Netto Thüngersheim | Am Straßacker 1, 97291 Thüngersheim | 192 / 192 | 54 | 123 | 15 | 72 |
 | Kaufland Würzburg | Nürnberger Straße 12, 97076 Würzburg-Grombühl | 118 / 118 | 4 | 104 | 10 | 28 |
 
-Gesamt: 865 geladene Karten, 864 mit Produkt und Preis erkannt, 270 Lebensmittelangebote übernommen, 517 unsichere und 77 verworfene Karten. Kein Markt erreichte eine belastbare Kartenzielzahl; der Lauf bleibt deshalb `incomplete`. Packungsgröße und Gültigkeit waren in den sichtbaren Angebotskarten häufig nicht vorhanden und wurden als `null` belassen. Die 204 Angebote der alten ALDI-SÜD-Datei sind weiterhin nur historische Parserausgabe.
+Gesamt: 865 geladene Karten, 864 mit Produkt und Preis erkannt, 270 Lebensmittelangebote übernommen, 517 unsichere und 77 verworfene Karten. Kein Markt erreichte eine belastbare Kartenzielzahl; die Marktabdeckung bleibt deshalb `incomplete`. Das ist kein Ausschluss der planungsbereiten Angebote: `summary.planningReadyOfferCount` zählt Datensätze mit Produkt, aktuellem Preis und Menge/Packung. Packungsgröße und Gültigkeit können bei anderen Karten `null` bleiben. Die 204 Angebote der alten ALDI-SÜD-Datei sind weiterhin nur historische Parserausgabe.
 
 ## Täglicher kostenloser Workflow
 
