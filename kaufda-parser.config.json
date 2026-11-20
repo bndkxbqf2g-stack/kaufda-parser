@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "locale": "de-DE",
   "location": {
     "city": "Zellingen",
@@ -9,22 +9,65 @@
   },
   "markets": [
     {
-      "key": "Aldi-Sued",
+      "key": "Lidl-Zellingen",
+      "label": "Lidl Zellingen",
+      "store": "Lidl",
+      "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
+      "url": "https://www.kaufda.de/search?query=Lidl&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
+      "productGroups": ["food"]
+    },
+    {
+      "key": "Aldi-Sued-Zellingen",
+      "label": "ALDI SÜD Zellingen",
       "store": "ALDI SÜD",
+      "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
       "url": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "productGroups": ["food"]
+    },
+    {
+      "key": "Edeka-Zellingen",
+      "label": "EDEKA Zellingen",
+      "store": "EDEKA",
+      "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
+      "url": "https://www.kaufda.de/search?query=EDEKA&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
+      "productGroups": ["food"]
+    },
+    {
+      "key": "Netto-Thuengersheim",
+      "label": "Netto Thüngersheim",
+      "store": "Netto Marken-Discount",
+      "location": { "city": "Thüngersheim", "zip": "97291", "lat": 49.882042399999996, "lng": 9.843200099999999 },
+      "url": "https://www.kaufda.de/search?query=Netto%20Marken-Discount&lat=49.882042399999996&lng=9.843200099999999&zip=97291&city=Th%C3%BCngersheim",
+      "productGroups": ["food"],
+      "sourceNote": "Öffentliche KaufDA-Suche; der sichtbare Standort muss je Lauf geprüft werden."
+    },
+    {
+      "key": "Kaufland-Wuerzburg",
+      "label": "Kaufland Würzburg",
+      "store": "Kaufland",
+      "location": { "city": "Würzburg" },
+      "url": "https://www.kaufda.de/search?query=Kaufland&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
+      "productGroups": ["food"],
+      "sourceNote": "Bezugsquelle für die sichtbare Kaufland-Filiale im Würzburger Raum; Distanz und Adresse bleiben Laufdaten."
     }
   ],
   "foodOnly": true,
   "excludeTerms": [
     "LED", "Arznei", "Shampoo", "Waschmittel", "Tierfutter", "Spielzeug",
-    "Werkzeug", "Pflanze", "Wein", "Bier", "Sekt", "Spirituose"
+    "Werkzeug", "Pflanze", "Wein", "Bier", "Sekt", "Spirituose",
+    "Duftkerze", "Geschirr", "Porzellan", "Pullover", "Tischleuchte"
   ],
+  "classification": {
+    "foodTerms": ["Salat-Mix", "Haferdrink", "Kokosjoghurt", "Prodomo"],
+    "nonFoodTerms": ["Kindergeschirr", "Serviergeschirr", "Motiv-Keramik", "Akku-Push"],
+    "uncertainTerms": ["Herzerwärmer", "Geschenkset"]
+  },
   "maxPrice": null,
+  "maxReviewItems": 30,
   "scroll": {
-    "delayMs": 1100,
-    "stepPx": 520,
-    "maxPasses": 420,
+    "delayMs": 850,
+    "stepPx": 640,
+    "maxPasses": 90,
     "stablePassesAtEnd": 5
   },
   "output": {
@@ -32,4 +75,3 @@
     "file": "offers.json"
   }
 }
-

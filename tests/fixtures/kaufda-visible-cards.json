@@ -1,0 +1,43 @@
+{
+  "capturedAt": "2026-11-19T04:35:51.381+01:00",
+  "cards": [
+    {
+      "cardId": "lidl-salat-mix-125g",
+      "name": "Salat-Mix",
+      "text": "Salat-Mix\n0,99 €\nItalien Klasse I 125 g\nPreis pro Einheit: 1 kg = 8,88 €\nGültig vom 16.11.2026 bis 21.11.2026",
+      "priceText": "0,99 €",
+      "packSizeText": "Italien Klasse I 125 g",
+      "unitPriceText": "Preis pro Einheit: 1 kg = 8,88 €",
+      "validityText": "Gültig vom 16.11.2026 bis 21.11.2026",
+      "sourceUrl": "https://www.kaufda.de/angebote/lidl-salat-mix",
+      "imageUrl": "https://img.example.test/salat-mix.jpg"
+    },
+    {
+      "cardId": "kaufland-prodomo-500g",
+      "name": "DALLMAYR Prodomo",
+      "text": "DALLMAYR Prodomo\n5,99 €\ngemahlen oder ganze Bohnen, versch. Sorten 500-g-Packg.\n1 kg = 11,98 €\nGültig bis 21.11.2026",
+      "priceText": "5,99 €",
+      "packSizeText": "versch. Sorten 500-g-Packg.",
+      "unitPriceText": "1 kg = 11,98 €",
+      "validityText": "Gültig bis 21.11.2026",
+      "sourceUrl": "https://www.kaufda.de/angebote/kaufland-prodomo",
+      "imageUrl": "https://img.example.test/prodomo.jpg"
+    },
+    {
+      "cardId": "aldi-duftkerze-1",
+      "name": "Duftkerze Scandinavian Forest",
+      "text": "Duftkerze Scandinavian Forest\n4,99 €\nGültig bis 21.11.2026",
+      "priceText": "4,99 €",
+      "validityText": "Gültig bis 21.11.2026",
+      "sourceUrl": "https://www.kaufda.de/angebote/aldi-duftkerze"
+    },
+    {
+      "cardId": "aldi-herzerwaermer-1",
+      "name": "Herzerwärmer",
+      "text": "Herzerwärmer\n2,49 €\nGültig bis 21.11.2026",
+      "priceText": "2,49 €",
+      "validityText": "Gültig bis 21.11.2026",
+      "sourceUrl": "https://www.kaufda.de/angebote/aldi-herzerwaermer"
+    }
+  ]
+}
