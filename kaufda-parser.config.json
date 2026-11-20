@@ -70,6 +70,13 @@
     "maxPasses": 90,
     "stablePassesAtEnd": 5
   },
+  "detail": {
+    "enabled": true,
+    "concurrency": 4,
+    "waitMs": 250,
+    "fieldTimeoutMs": 4000,
+    "navigationTimeoutMs": 15000
+  },
   "output": {
     "directory": "generated",
     "file": "offers.json"

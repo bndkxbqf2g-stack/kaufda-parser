@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/bndkxbqf2g-stack/kaufda-parser/main/schemas/vorratskompass-offers-v1.schema.json",
+  "title": "Vorratskompass KaufDA Offers",
+  "description": "Struktureller Vertrag für den öffentlichen KaufDA-Angebotsfeed. Cross-field-Invarianten werden zusätzlich durch cli.mjs verify geprüft.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "contractVersion",
+    "parser",
+    "fetchedAt",
+    "summary",
+    "markets",
+    "offers"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "kaufda-offers/v2" },
+    "contractVersion": { "const": "vorratskompass-offers/v1" },
+    "parser": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "kaufda-parser" },
+        "version": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "fetchedAt": { "type": "string", "format": "date-time" },
+    "location": { "type": "object" },
+    "summary": {
+      "type": "object",
+      "required": [
+        "marketCount",
+        "foodOfferCount",
+        "planningReadyOfferCount",
+        "planningReviewOfferCount",
+        "completenessStatus",
+        "planningCompletenessStatus"
+      ],
+      "properties": {
+        "marketCount": { "type": "integer", "minimum": 0 },
+        "foodOfferCount": { "type": "integer", "minimum": 0 },
+        "planningReadyOfferCount": { "type": "integer", "minimum": 0 },
+        "planningReviewOfferCount": { "type": "integer", "minimum": 0 },
+        "completenessStatus": { "enum": ["complete", "incomplete", "failed"] },
+        "planningCompletenessStatus": { "enum": ["complete", "partial", "empty"] }
+      },
+      "additionalProperties": true
+    },
+    "markets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["marketKey", "locationStatus", "completenessStatus"],
+        "properties": {
+          "marketKey": { "type": ["string", "null"] },
+          "locationStatus": { "enum": ["matched", "unknown", "mismatch"] },
+          "completenessStatus": { "enum": ["complete", "incomplete", "failed"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "offers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "product",
+          "price",
+          "currency",
+          "status",
+          "planningStatus",
+          "sourceUrl",
+          "capturedAt",
+          "fetchedAt",
+          "classification",
+          "fieldStatus",
+          "marketLocationStatus"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "product": { "type": "string", "minLength": 1 },
+          "productDescription": { "type": ["string", "null"] },
+          "market": { "type": ["string", "null"] },
+          "marketKey": { "type": ["string", "null"] },
+          "store": { "type": ["string", "null"] },
+          "price": { "type": "number", "minimum": 0 },
+          "priceLabel": { "type": ["string", "null"] },
+          "currency": { "const": "EUR" },
+          "discountAmount": { "type": ["number", "null"], "minimum": 0 },
+          "basePrice": { "type": ["number", "null"], "minimum": 0 },
+          "previousPrice": { "type": ["number", "null"], "minimum": 0 },
+          "priceType": { "type": ["string", "null"] },
+          "status": { "enum": ["verified", "needs-review"] },
+          "planningStatus": { "enum": ["ready", "needs-review"] },
+          "pack": { "type": ["string", "null"] },
+          "packSize": { "type": ["string", "null"] },
+          "packSizeValue": { "type": ["number", "null"], "minimum": 0 },
+          "packSizeUnit": { "type": ["string", "null"] },
+          "packCount": { "type": ["integer", "null"], "minimum": 1 },
+          "unitPrice": { "type": ["number", "null"], "minimum": 0 },
+          "unitPriceUnit": { "type": ["string", "null"] },
+          "unitPriceText": { "type": ["string", "null"] },
+          "sourceUrl": { "type": "string", "pattern": "^https://(?:www\\.)?kaufda\\.de/" },
+          "source": { "type": ["string", "null"] },
+          "sourceId": { "type": ["string", "null"] },
+          "capturedAt": { "type": "string", "format": "date-time" },
+          "fetchedAt": { "type": "string", "format": "date-time" },
+          "validFrom": { "type": ["string", "null"], "format": "date" },
+          "validUntil": { "type": ["string", "null"], "format": "date" },
+          "validTo": { "type": ["string", "null"], "format": "date" },
+          "reviewStatus": { "enum": ["ready", "needs-review"] },
+          "classification": {
+            "type": "object",
+            "required": ["label", "confidence"],
+            "properties": {
+              "label": { "enum": ["food", "nonfood", "uncertain"] },
+              "confidence": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "fieldStatus": { "type": "object" },
+          "marketLocationStatus": { "enum": ["matched", "unknown"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

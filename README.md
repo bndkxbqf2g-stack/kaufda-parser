@@ -38,17 +38,28 @@ Die tatsächliche KaufDA-Quelle, der sichtbare Standort, die Entfernung und die 
 
 Das aktuelle Format ist `kaufda-offers/v2` mit `contractVersion: vorratskompass-offers/v1`.
 
-Jedes übernommene Lebensmittelangebot enthält weiterhin flache, leicht importierbare Felder (`product`, `market`, `pack`, `price`, `basePrice`, `validFrom`, `validTo`, `sourceUrl`) und zusätzlich nachvollziehbare Qualitätsdaten:
+Jedes übernommene Lebensmittelangebot wird aus einer festen Veröffentlichungs-Whitelist erzeugt. Aus der sichtbaren KaufDA-Karte bzw. Detailansicht werden nur diese Angebotsfelder veröffentlicht:
 
-- `fieldStatus`: getrennt sichtbare oder fehlende Werte für Produkt, Preis, Packung, Grundpreis, Gültigkeit und Quelle;
+- `product` und `productDescription`;
+- `price`, `priceLabel`, `discountAmount`, `basePrice`, `previousPrice` und `priceType`;
+- `pack`, `packSize`, `packSizeValue`, `packSizeUnit` und `packCount`;
+- `unitPrice`, `unitPriceUnit` und `unitPriceText`;
+- `validFrom`, `validUntil` und `validTo`;
+- Markt-/Quellenfelder (`market`, `marketKey`, `store`, `sourceUrl`, `source`, `sourceId`).
+
+Zusätzlich bleiben nur die für den sicheren Vertrag erforderlichen technischen Felder erhalten: `id`, `currency`, `capturedAt`, `fetchedAt`, `classification`, `fieldStatus`, `marketLocationStatus`, `status`, `reviewStatus` und `planningStatus`. Nicht veröffentlicht werden unter anderem `rawText`, `imageUrl`, `category`, `priceEvidence` und das interne `validity`-Objekt.
+
+Die Mengen werden semantisch normalisiert: Bei `10 x 20 g = 200-g-Packung` ist `packSizeValue` `200`, `packSizeUnit` `g` und `packCount` `10`. Bei Varianten wie `40-, 45- bzw. 55-g-Packung` bleibt der Wert `null`, `fieldStatus.packSize` wird `ambiguous` und das Angebot bleibt `planningStatus: needs-review`.
+
+Zusätzliche Qualitätsfelder:
+
+- `fieldStatus`: getrennt sichtbare, fehlende oder mehrdeutige Werte für Produkt, Beschreibung, Preis, Packung, Grundpreis, Gültigkeit und Quelle;
 - `classification`: `food`, `nonfood` oder `uncertain` mit Gründen und Merkmalen;
-- `status`/`reviewStatus`: `verified` sobald Produkt, aktueller Angebotspreis und Packungs-/Mengenangabe für die Planung vorliegen; Grundpreis und Gültigkeit bleiben separat sichtbar;
-- `rawText`: begrenzter Rohtext der sichtbaren Karte, damit Korrekturen möglich bleiben;
+- `status`/`reviewStatus`: `verified` sobald Produkt, aktueller Angebotspreis und eindeutige Packungs-/Mengenangabe für die Planung vorliegen;
 - `capturedAt`, `fetchedAt`, Markt, Quelle und Gültigkeitszeitraum;
 - `marketLocationStatus` sowie der Marktstatus mit sichtbarer Adresse, damit falsch aufgelöste KaufDA-Orte nicht in den PWA-Feed gelangen;
 - stabile IDs, die Markt, Quelle, Produkt, Preis, Packungsgröße und Gültigkeit berücksichtigen.
-- Preiszeilen werden semantisch getrennt: `price` ist der aktuelle Angebotspreis, `discountAmount` ein sichtbarer „sparen!“-Betrag und `basePrice`/`previousPrice` der durchgestrichene Regelpreis. Sternchen und Darstellungshinweise werden ignoriert.
-- `priceType` und `priceEvidence` dokumentieren, ob ein Regelpreis oder Rabatt sichtbar war. Ein Angebot gilt für die Planung als vollständig, sobald Produkt, aktueller Angebotspreis und Packungs-/Mengenangabe erkannt wurden; Grundpreis und Gültigkeit sind Zusatzdaten.
+- Preiszeilen werden semantisch getrennt: `price` ist der aktuelle Angebotspreis, `discountAmount` ein sichtbarer „sparen!“-Betrag und `basePrice`/`previousPrice` der durchgestrichene Regelpreis. Ein allein stehender `sparen!`-Betrag wird niemals als Angebotspreis veröffentlicht.
 - Relative Hinweise wie „Endet morgen“ werden anhand von `capturedAt` in ein absolutes `validUntil` überführt. Nach Ablauf fällt der Aktionspreis aus der aktiven Planung; ein gespeicherter durchgestrichener regulärer Preis bleibt als Normalpreis erhalten.
 
 Nichtlebensmittel und unklare Karten werden nicht als Lebensmittelangebote ausgegeben. Sie erscheinen stattdessen in `reviewItems` und in den Markt-Zählungen. Die Zusammenfassung unterscheidet ausdrücklich:
@@ -65,17 +76,17 @@ Wenn KaufDA nur eine Anzeige wie `1 / 37` liefert, wird sie als `targetPageCount
 
 ## Belegter Live-Test
 
-Ein begrenzter Live-Lauf der sichtbaren öffentlichen Seiten wurde am `2026-11-19T04:55:41Z` ausgeführt. Alle fünf Quellen lieferten ohne Browser- oder Netzwerkfehler einen sichtbaren Standort. Die Zahlen sind der Testlauf und nicht die historische Datei `generated/offers.json`.
+Der verifizierte Live-Lauf der sichtbaren öffentlichen Seiten wurde am `2026-11-20T11:02:05Z` abgeschlossen. Alle fünf Quellen lieferten ohne Marktfehler einen sichtbaren Standort. Für erkannte Lebensmittelkandidaten wurden die verlinkten öffentlichen KaufDA-Detailansichten nachgeladen.
 
 | Markt | sichtbarer Standort | Karten geladen / erkannt | Lebensmittel | unsicher | verworfen | Prospektseiten |
 |---|---|---:|---:|---:|---:|---:|
-| Lidl Zellingen | Am Güßgraben 2, 97225 Zellingen-Retzbach | 172 / 172 | 95 | 66 | 11 | 42 |
-| ALDI SÜD Zellingen | Würzburger Straße 74, 97225 Zellingen-Gemarkung Zellingen | 200 / 199 | 63 | 103 | 33 | 37 |
-| EDEKA Zellingen | Würzburger Straße 100, 97225 Zellingen | 183 / 183 | 54 | 121 | 8 | 42 |
-| Netto Thüngersheim | Am Straßacker 1, 97291 Thüngersheim | 192 / 192 | 54 | 123 | 15 | 72 |
-| Kaufland Würzburg | Nürnberger Straße 12, 97076 Würzburg-Grombühl | 118 / 118 | 4 | 104 | 10 | 28 |
+| Lidl Zellingen | Am Güßgraben 2, 97225 Zellingen-Retzbach | 172 / 172 | 94 | 67 | 11 | 42 |
+| ALDI SÜD Zellingen | Würzburger Straße 74, 97225 Zellingen-Gemarkung Zellingen | 200 / 199 | 65 | 101 | 33 | 37 |
+| EDEKA Zellingen | Würzburger Straße 100, 97225 Zellingen | 183 / 183 | 52 | 123 | 8 | 42 |
+| Netto Thüngersheim | Am Straßacker 1, 97291 Thüngersheim | 197 / 197 | 56 | 124 | 17 | 74 |
+| Kaufland Würzburg | Nürnberger Straße 12, 97076 Würzburg-Grombühl | 118 / 118 | 0 | 108 | 10 | 28 |
 
-Gesamt: 865 geladene Karten, 864 mit Produkt und Preis erkannt, 270 Lebensmittelangebote übernommen, 517 unsichere und 77 verworfene Karten. Kein Markt erreichte eine belastbare Kartenzielzahl; die Marktabdeckung bleibt deshalb `incomplete`. Das ist kein Ausschluss der planungsbereiten Angebote: `summary.planningReadyOfferCount` zählt Datensätze mit Produkt, aktuellem Preis und Menge/Packung. Packungsgröße und Gültigkeit können bei anderen Karten `null` bleiben. Die 204 Angebote der alten ALDI-SÜD-Datei sind weiterhin nur historische Parserausgabe.
+Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittelangebote übernommen, 523 unsichere und 79 verworfene Karten. Kein Markt erreichte eine belastbare Kartenzielzahl; die Marktabdeckung bleibt deshalb `incomplete`. Davon sind 224 Angebote planungsbereit und 43 prüfpflichtig. Packungsgröße und Gültigkeit können bei anderen Karten `null` bleiben. `Kaufland Würzburg` lieferte in diesem Lauf keine als Lebensmittel bestätigten Angebote.
 
 ## Täglicher kostenloser Workflow
 
@@ -85,11 +96,13 @@ Der Workflow:
 
 1. installiert die Abhängigkeiten und führt die Unit-Tests aus;
 2. installiert Chromium für Playwright;
-3. schreibt zunächst nach `generated/offers.next.json`;
-4. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
-5. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
-6. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
-7. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
+3. liest die sichtbaren Karten und öffnet für erkannte Lebensmittelkandidaten die verlinkte öffentliche KaufDA-Detailansicht;
+4. übernimmt daraus ausschließlich die vereinbarten Produkt-, Beschreibungs-, Preis-, Mengen-, Grundpreis-, Gültigkeits-, Markt- und Quellenfelder;
+5. schreibt zunächst nach `generated/offers.next.json`;
+6. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
+7. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
+8. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
+9. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
 
 Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
 
@@ -97,7 +110,15 @@ Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
 https://raw.githubusercontent.com/bndkxbqf2g-stack/kaufda-parser/main/generated/offers.json
 ```
 
-Beim Import sollte die PWA nur `offers` lesen, `status` und `completenessStatus` anzeigen und Angebote als `needs-review` behandeln, wenn Pflichtfelder fehlen. Der Feed darf keine bestätigten Vorräte, Einkaufslisten oder Rezeptfreigaben verändern.
+Das strukturelle Vertragsschema liegt unter `schemas/vorratskompass-offers-v1.schema.json`. `node src/cli.mjs verify` prüft zusätzlich die Cross-Field-Invarianten, die ein JSON-Schema allein nicht ausdrücken kann.
+
+Beim Import sollte die PWA:
+
+- nur `offers` lesen und `summary.completenessStatus`, `summary.planningCompletenessStatus` sowie `fetchedAt` sichtbar anzeigen;
+- ausschließlich `status: "verified"`, `planningStatus: "ready"` und `marketLocationStatus: "matched"` als automatische Planungsvorschläge verwenden;
+- alle anderen Angebote als `needs-review` behandeln und niemals automatisch in bestätigte Vorräte, Einkaufslisten oder Rezeptfreigaben übernehmen;
+- `product`, `productDescription` und URLs als untrusted input behandeln, mit Textknoten statt `innerHTML` rendern und nur HTTPS-Links öffnen;
+- den zuletzt validierten Feed offline als last-known-good-Version behalten und bei veralteten Daten einen sichtbaren Hinweis anzeigen.
 
 Der Parser-Feed ist damit für einen späteren, klar begrenzten PWA-Import vorbereitet. In diesem Entwicklungsschritt wurden keine Vorratskompass-Dateien geändert; die App-Integration bleibt nach Review des Feed-Vertrags ein eigener Schritt.
 

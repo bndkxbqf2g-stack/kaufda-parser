@@ -75,13 +75,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
       - run: npm ci --no-audit --no-fund
       - run: npm test
-      - run: npx playwright install chromium
+      - run: node src/cli.mjs validate --config kaufda-parser.config.json
+      - run: npx --no-install playwright install chromium
       - run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.next.json
       - run: node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.next.json
       - run: mv generated/offers.next.json generated/offers.json

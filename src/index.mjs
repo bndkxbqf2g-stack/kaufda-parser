@@ -6,6 +6,21 @@ export const VERSION = '0.2.0';
 export const SCHEMA_VERSION = 'kaufda-offers/v2';
 export const PWA_CONTRACT_VERSION = 'vorratskompass-offers/v1';
 
+// Diese Liste ist die Veröffentlichungsgrenze. Rohtext, Bilder, Kategorien und
+// andere DOM-Daten dürfen intern zur Erkennung dienen, werden aber nicht als
+// Angebotsfelder veröffentlicht.
+export const PUBLISHED_OFFER_FIELDS = Object.freeze([
+  'id', 'product', 'productDescription',
+  'market', 'marketKey', 'store', 'marketLocationStatus',
+  'price', 'priceLabel', 'currency', 'discountAmount', 'basePrice', 'previousPrice', 'priceType',
+  'pack', 'packSize', 'packSizeValue', 'packSizeUnit', 'packCount',
+  'unitPrice', 'unitPriceUnit', 'unitPriceText',
+  'validFrom', 'validUntil', 'validTo',
+  'sourceUrl', 'source', 'sourceId', 'capturedAt', 'fetchedAt',
+  'classification', 'fieldStatus',
+  'status', 'reviewStatus', 'planningStatus'
+]);
+
 export const DEFAULT_EXCLUDE_TERMS = [
   'apotheke', 'arznei', 'schmerzmittel', 'vitamin', 'shampoo', 'dusche',
   'kosmetik', 'zahnbürste', 'zahnpasta', 'waschmittel', 'weichspüler',
@@ -16,7 +31,9 @@ export const DEFAULT_EXCLUDE_TERMS = [
   'spirituose', 'tabak', 'duftkerze', 'kerze', 'geschirr', 'porzellan',
   'tischleuchte', 'pullover', 'streichhölzer', 'akku', 'kerzen', 'kasserolle',
   'gusseisen', 'brotbacktopf', 'topf', 'besteck', 'badematte', 'pyjama',
-  'pantoffeln', 'decke', 'kissen', 'keksdose', 'bausatz', 'soundbox'
+  'pantoffeln', 'decke', 'kissen', 'keksdose', 'bausatz', 'soundbox',
+  'toaster', 'wasserkocher', 'kaffeemaschine', 'kaffeevollautomat',
+  'kaffeepadmaschine', 'kapselmaschine', 'espressoautomat', 'standmixer'
 ];
 
 export const DEFAULT_FOOD_TERMS = [
@@ -64,6 +81,13 @@ export const DEFAULT_CONFIG = {
     maxPasses: 420,
     stablePassesAtEnd: 5
   },
+  detail: {
+    enabled: true,
+    concurrency: 4,
+    waitMs: 250,
+    fieldTimeoutMs: 4000,
+    navigationTimeoutMs: 15000
+  },
   output: { directory: 'generated', file: 'offers.json' }
 };
 
@@ -72,6 +96,7 @@ const DATE_TOKEN = '(\\d{1,2}\\.\\d{1,2}(?:\\.\\d{2,4})?)';
 const DATE_RE = new RegExp(`(?:gültig|gültigkeit)(?:\\s+bis)?\\s*[:\\-]?\\s*${DATE_TOKEN}`, 'i');
 const RANGE_RE = new RegExp(`${DATE_TOKEN}\\s*(?:-|–|bis)\\s*${DATE_TOKEN}`, 'i');
 const PACK_RE = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
+const PACK_RANGE_RE = /((?:\d+(?:[,.]\d+)?\s*[-–]\s*,?\s*(?:bzw\.?\s*)?)+\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|packung|packg\.?|portion(?:en)?)(?:\s*[- ]?(?:packung|packg\.?))?)/i;
 const UNIT_PRICE_RE = /(?:1\s*)?(kg|g|l|ml|cl|stück|stk\.?)\s*=\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€?/i;
 const UNIT_PRICE_LINE_RE = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
 
@@ -97,6 +122,26 @@ function validUrl(value) {
   }
 }
 
+function isKaufdaSourceUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && ['kaufda.de', 'www.kaufda.de'].includes(url.hostname.toLocaleLowerCase('de-DE'));
+  } catch (_) {
+    return false;
+  }
+}
+
+function isValidTimestamp(value) {
+  return typeof value === 'string' && value.includes('T') && Number.isFinite(new Date(value).getTime());
+}
+
+function isValidDateOnly(value) {
+  if (value == null) return true;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function stableHash(value) {
   return createHash('sha256').update(String(value)).digest('hex').slice(0, 20);
 }
@@ -108,7 +153,7 @@ function termsFound(text, terms = []) {
     const candidate = term.toLocaleLowerCase('de-DE');
     if (candidate.includes(' ') || candidate.includes('-')) return lowered.includes(candidate);
     return tokens.some((token) => token === candidate
-      || (candidate.length > 3 && token.length - candidate.length >= 2
+      || ((candidate.length > 3 || candidate === 'tee') && token.length - candidate.length >= 2
         && (token.startsWith(candidate) || token.endsWith(candidate))));
   });
 }
@@ -120,6 +165,7 @@ export function mergeConfig(input = {}) {
     ...input,
     location: { ...DEFAULT_CONFIG.location, ...(input.location ?? {}) },
     scroll: { ...DEFAULT_CONFIG.scroll, ...(input.scroll ?? {}) },
+    detail: { ...DEFAULT_CONFIG.detail, ...(input.detail ?? {}) },
     output: { ...DEFAULT_CONFIG.output, ...(input.output ?? {}) },
     classification: {
       foodTerms: uniqueStrings([...DEFAULT_CLASSIFICATION.foodTerms, ...(classification.foodTerms ?? [])]),
@@ -175,6 +221,13 @@ export function parsePriceCandidates(value) {
     .filter((price) => price != null);
 }
 
+export function extractPriceText(lines = []) {
+  return lines
+    .map(normalizeText)
+    .filter((line) => /€/.test(line) && !UNIT_PRICE_LINE_RE.test(line))
+    .join(' ');
+}
+
 export function parsePriceDetails(value) {
   const text = normalizeText(value);
   const candidates = [...text.matchAll(/((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/gi)]
@@ -186,6 +239,15 @@ export function parsePriceDetails(value) {
     const discountAmount = parseGermanNumber(saving[1]);
     const savingIndex = saving.index ?? 0;
     const following = candidates.filter((candidate) => candidate.index >= savingIndex + saving[0].length);
+    if (!following.length) {
+      return {
+        currentPrice: null,
+        previousPrice: null,
+        discountAmount,
+        type: 'discount-only',
+        text: text || null
+      };
+    }
     return {
       currentPrice: following[0]?.value ?? candidates[0].value,
       previousPrice: following[1]?.value ?? null,
@@ -262,14 +324,58 @@ export function parseValidity(value, referenceDate = new Date()) {
 }
 
 export function parsePackSize(value) {
-  const text = normalizeText(value).match(PACK_RE)?.[0] ?? null;
-  if (!text) return { text: null, value: null, unit: null, count: null };
-  const match = text.match(/(?:(\d+)\s*[x×]\s*)?(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)/i);
+  const normalized = normalizeText(value);
+  if (!normalized) return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
+
+  const range = normalized.match(PACK_RANGE_RE);
+  if (range) {
+    const unit = range[1].match(/(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?$/i)?.[1]?.replace('.', '').toLocaleLowerCase('de-DE') ?? null;
+    const variants = [...range[1].matchAll(/(\d+(?:[,.]\d+)?)/g)]
+      .map((match) => parseGermanNumber(match[1]))
+      .filter((number) => number != null);
+    return {
+      text: range[1],
+      value: null,
+      unit,
+      count: null,
+      itemValue: null,
+      itemUnit: unit,
+      ambiguous: true,
+      variants
+    };
+  }
+
+  const multiplier = normalized.match(/\b(\d+)\s*[x×]\s*(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)/i);
+  if (multiplier) {
+    const count = Number(multiplier[1]);
+    const itemValue = parseGermanNumber(multiplier[2]);
+    const itemUnit = multiplier[3].replace('.', '').toLocaleLowerCase('de-DE');
+    return {
+      text: multiplier[0],
+      value: itemValue == null ? null : Math.round(itemValue * count * 100) / 100,
+      unit: itemUnit,
+      count,
+      itemValue,
+      itemUnit,
+      ambiguous: false,
+      variants: []
+    };
+  }
+
+  const text = normalized.match(PACK_RE)?.[0] ?? null;
+  if (!text) return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
+  const match = text.match(/(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)/i);
+  const itemValue = match ? parseGermanNumber(match[1]) : null;
+  const itemUnit = match ? match[2].replace('.', '').toLocaleLowerCase('de-DE') : null;
   return {
     text,
-    value: match ? parseGermanNumber(match[2]) : null,
-    unit: match ? match[3].replace('.', '').toLocaleLowerCase('de-DE') : null,
-    count: match?.[1] ? Number(match[1]) : null
+    value: itemValue,
+    unit: itemUnit,
+    count: null,
+    itemValue,
+    itemUnit,
+    ambiguous: false,
+    variants: []
   };
 }
 
@@ -316,7 +422,7 @@ export function isLikelyFood(name, options = {}, context = '') {
 }
 
 function chooseName(lines, explicitName = '') {
-  const ignored = /€|kg-preis|l-preis|uvp|gültig|angebot|kaufda|mehr zu den|sortieren|^(aldi|edeka|lidl|penny|netto|kaufland|marktkauf)\b|^(aktuelle angebote|gutes für alle|wir lieben lebensmittel|lidl lohnt sich)$/i;
+  const ignored = /€|kg-preis|l-preis|uvp|gültig|angebot|produktbeschreibung|preisdetails|preis\s+pro\s+einheit|kaufda|mehr zu den|sortieren|^(aldi|edeka|lidl|penny|netto|kaufland|marktkauf)\b|^(aktuelle angebote|gutes für alle|wir lieben lebensmittel|lidl lohnt sich)$/i;
   if (explicitName && explicitName.length >= 2 && !ignored.test(explicitName)) return normalizeText(explicitName);
   const candidates = lines
     .map(normalizeText)
@@ -335,8 +441,28 @@ function findPackSizeText(value = '') {
     .find((line) => PACK_RE.test(line) && !UNIT_PRICE_LINE_RE.test(line)) ?? '';
 }
 
+function findProductDescriptionText(value = '') {
+  const lines = String(value)
+    .split(/\r?\n+/)
+    .map(normalizeText)
+    .filter(Boolean);
+  const start = lines.findIndex((line) => PACK_RE.test(line) && !UNIT_PRICE_LINE_RE.test(line));
+  if (start < 0) return '';
+  const description = [lines[start]];
+  for (const line of lines.slice(start + 1)) {
+    if (/[€]/.test(line) || UNIT_PRICE_LINE_RE.test(line) || /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) break;
+    if (/^(?:produktbeschreibung|preisdetails|angebotspreis|preis\s+pro\s+einheit)$/i.test(line)) break;
+    description.push(line);
+  }
+  return normalizeText(description.join(' '));
+}
+
+function findPriceLabel(lines = []) {
+  return lines.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis|ab\s+\d)/i.test(normalizeText(line))) ?? null;
+}
+
 function assessmentId(raw, market, name, price, packSize, validUntil) {
-  const sourceIdentity = raw.cardId ?? raw.productId ?? raw.sourceId ?? raw.sourceUrl ?? raw.imageUrl ?? '';
+  const sourceIdentity = raw.cardId ?? raw.productId ?? raw.sourceId ?? raw.sourceUrl ?? '';
   return `${slug(market.key ?? market.label ?? market.store ?? 'markt')}:${stableHash(`${sourceIdentity}|${name}|${price}|${packSize ?? ''}|${validUntil ?? ''}`)}`;
 }
 
@@ -346,15 +472,16 @@ function marketLabel(market) {
 
 export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt = new Date().toISOString()) {
   const config = configInput.classification ? configInput : mergeConfig(configInput);
-  const text = normalizeText(raw.text ?? [raw.name, raw.priceText, raw.packSizeText, raw.unitPriceText, raw.validityText].filter(Boolean).join('\n'));
+  const text = normalizeText(raw.text ?? [raw.name, raw.productDescription, raw.priceText, raw.packSizeText, raw.unitPriceText, raw.validityText].filter(Boolean).join('\n'));
   const lines = String(raw.text ?? text).split(/\r?\n/).map(normalizeText).filter(Boolean);
   const name = chooseName(lines, raw.name);
-  const priceDetails = raw.priceDetails ?? parsePriceDetails(raw.priceText ?? text);
+  const priceDetails = raw.priceDetails ?? parsePriceDetails(raw.priceText || text);
   const reportedPrice = raw.price == null ? null : Number(raw.price);
   const price = Number.isFinite(priceDetails.currentPrice) ? priceDetails.currentPrice : reportedPrice;
-  const pack = parsePackSize(raw.packSizeText ?? findPackSizeText(raw.text ?? text));
-  const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText ?? findLine(lines, /pro Einheit|kg\s*=|l\s*=|kg[- ]?Preis|l[- ]?Preis|\/kg|\/l/i)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
-  const validity = raw.validity ?? parseValidity(raw.validityText ?? text, fetchedAt);
+  const productDescription = normalizeText(raw.productDescription || findProductDescriptionText(raw.text ?? text)) || null;
+  const pack = parsePackSize(raw.packSizeText || productDescription || findPackSizeText(raw.text ?? text));
+  const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, /pro Einheit|kg\s*=|l\s*=|kg[- ]?Preis|l[- ]?Preis|\/kg|\/l/i)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+  const validity = raw.validity ?? parseValidity(raw.validityText || text, fetchedAt);
   const validFrom = raw.validFrom ?? validity.validFrom ?? null;
   const validUntil = raw.validUntil ?? raw.validTo ?? validity.validUntil ?? null;
   const sourceUrl = raw.sourceUrl ?? market.url ?? null;
@@ -362,8 +489,9 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const recognized = Boolean(name && Number.isFinite(price));
   const fieldStatus = {
     product: name ? 'visible' : 'missing',
+    productDescription: productDescription ? 'visible' : 'missing',
     price: Number.isFinite(price) ? 'visible' : 'missing',
-    packSize: pack.text ? 'visible' : 'missing',
+    packSize: pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
     source: validUrl(sourceUrl) ? 'visible' : 'missing'
@@ -372,6 +500,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   let state = 'unrecognized';
   if (!name) reasons.push('Produktname fehlt.');
   if (!Number.isFinite(price)) reasons.push('Angebotspreis fehlt oder ist ungültig.');
+  if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
   if (recognized && classification.label === 'nonfood') {
     state = 'rejected';
     reasons.push(...classification.reasons);
@@ -407,6 +536,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
         market: marketLabel(market),
         store: market.store ?? marketLabel(market),
         name,
+        productDescription,
         price: Number.isFinite(price) ? price : null,
         packSize: pack.text,
         unitPrice: Number.isFinite(unit.amount) ? unit.amount : null,
@@ -416,7 +546,6 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
         fieldStatus,
         state,
         reasons,
-        rawText: text.slice(0, 2000)
       }
     };
   }
@@ -425,7 +554,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   // und Packungs-/Mengenangabe die Pflichtangaben. Grundpreis und Gültigkeit
   // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
   const planningReady = Boolean(
-    name && Number.isFinite(price) && pack.text && validUrl(sourceUrl)
+    name && Number.isFinite(price) && pack.text && pack.value != null && !pack.ambiguous && validUrl(sourceUrl)
     && classification.label === 'food' && classification.confidence === 'high'
   );
   const complete = planningReady;
@@ -434,14 +563,14 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     market: marketLabel(market),
     marketKey: market.key ?? null,
     store: market.store ?? marketLabel(market),
-    name,
     product: name,
+    productDescription,
     price,
+    priceLabel: raw.priceLabel || findPriceLabel(lines),
     basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
     previousPrice: priceDetails.previousPrice,
     discountAmount: priceDetails.discountAmount,
     priceType: priceDetails.type,
-    priceEvidence: priceDetails,
     planningStatus: planningReady ? 'ready' : 'needs-review',
     currency: raw.currency ?? 'EUR',
     packSize: pack.text,
@@ -452,7 +581,6 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     unitPrice: Number.isFinite(unit.amount) ? unit.amount : null,
     unitPriceUnit: unit.unit,
     unitPriceText: unit.text,
-    imageUrl: raw.imageUrl ?? raw.image ?? null,
     sourceUrl,
     source: 'kaufda-visible-public-page',
     sourceId: raw.cardId ?? raw.productId ?? raw.sourceId ?? null,
@@ -461,15 +589,16 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     validFrom,
     validUntil,
     validTo: validUntil,
-    validity: { validFrom, validUntil, status: validity.status, text: validity.text ?? null },
-    category: raw.category ?? null,
     classification,
     fieldStatus,
     reviewStatus: complete ? 'ready' : 'needs-review',
     status: complete ? 'verified' : 'needs-review',
-    rawText: text.slice(0, 2000)
   };
   return { state, recognized, offer, classification, fieldStatus, reasons, reviewItem: null };
+}
+
+export function selectPublishedOffer(offer = {}) {
+  return Object.fromEntries(PUBLISHED_OFFER_FIELDS.map((field) => [field, offer[field] ?? null]));
 }
 
 export function normalizeOffer(raw, market, config = {}) {
@@ -500,6 +629,18 @@ async function readKaufdaSnapshot(page) {
     const locationText = bodyLines.find((line) => /\bkm\b/i.test(line) && /,/.test(line)) || null;
     const visiblePackRe = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
     const visibleUnitPriceLineRe = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
+    const findProductDescription = (lines) => {
+      const start = lines.findIndex((line) => visiblePackRe.test(line) && !visibleUnitPriceLineRe.test(line));
+      if (start < 0) return '';
+      const description = [lines[start]];
+      for (const line of lines.slice(start + 1)) {
+        if (/€/.test(line) || visibleUnitPriceLineRe.test(line) || /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) break;
+        if (/^(?:produktbeschreibung|preisdetails|angebotspreis|preis\s+pro\s+einheit)$/i.test(line)) break;
+        description.push(line);
+      }
+      return description.join(' ').replace(/\s+/g, ' ').trim();
+    };
+    const findPriceLabel = (lines) => lines.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis|ab\s+\d)/i.test(line.trim())) || null;
     const selectors = [
       '[data-testid*="offer"]', '[data-testid*="Offer"]',
       '[data-testid*="product"]', '[data-testid*="Product"]',
@@ -533,7 +674,6 @@ async function readKaufdaSnapshot(page) {
     const cards = [];
     const seen = new Set();
     for (const item of candidates) {
-      const imageUrl = item.image.currentSrc || item.image.src || item.image.getAttribute('data-src') || null;
       const lines = item.text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
       const explicitName = item.element.querySelector(
         '[data-testid*="name"], [data-testid*="title"], [class*="offer-name"], [class*="product-name"], h2, h3, h4'
@@ -545,11 +685,15 @@ async function readKaufdaSnapshot(page) {
       const sourceUrl = item.element.querySelector('a[href]')?.href || (item.element.matches('a[href]') ? item.element.href : location.href);
       let productId = null;
       try { productId = new URL(sourceUrl).searchParams.get('productId'); } catch (_) { /* visible URL may be relative */ }
-      const priceText = lines.find((line) => /€/.test(line)) || '';
+      const priceText = lines
+        .filter((line) => /€/.test(line) && !visibleUnitPriceLineRe.test(line))
+        .join(' ');
+      const productDescriptionText = findProductDescription(lines);
+      const priceLabel = findPriceLabel(lines);
       const unitPriceText = lines.find((line) => /pro Einheit|kg\s*=|l\s*=|kg[- ]?Preis|l[- ]?Preis|\/kg|\/l/i.test(line)) || '';
       const validityText = lines.find((line) => /gültig|endet|noch\s+\d+\s+tage/i.test(line)) || '';
-      const packSizeText = lines.find((line) => visiblePackRe.test(line) && !visibleUnitPriceLineRe.test(line)) || '';
-      const key = `${sourceId ?? ''}|${item.text}|${imageUrl ?? ''}|${sourceUrl}`;
+      const packSizeText = productDescriptionText || lines.find((line) => visiblePackRe.test(line) && !visibleUnitPriceLineRe.test(line)) || '';
+      const key = `${sourceId ?? ''}|${item.text}|${sourceUrl}`;
       if (seen.has(key)) continue;
       seen.add(key);
       cards.push({
@@ -557,17 +701,113 @@ async function readKaufdaSnapshot(page) {
         sourceUrl,
         text: item.text,
         name: explicitName,
+        productDescription: productDescriptionText,
         priceText,
+        priceLabel,
         packSizeText,
         unitPriceText,
         validityText,
-        imageUrl: imageUrl && !/(kaufda|logo|placeholder|fallback)/i.test(imageUrl) ? imageUrl : null,
-        category: item.element.getAttribute('data-category') || item.element.getAttribute('data-category-name') || null,
         cardKey: key
       });
     }
     return { bodyText, pageUrl: location.href, locationText, cards };
   });
+}
+
+function productIdFromUrl(value) {
+  try {
+    return new URL(value).searchParams.get('productId');
+  } catch (_) {
+    return null;
+  }
+}
+
+async function readKaufdaDetailSnapshot(page, sourceUrl, detailConfig) {
+  if (!isKaufdaSourceUrl(sourceUrl) || !productIdFromUrl(sourceUrl)) return { skipped: true };
+  try {
+    await page.goto(sourceUrl, { waitUntil: 'domcontentloaded', timeout: detailConfig.navigationTimeoutMs });
+    await page.waitForTimeout(detailConfig.waitMs);
+    const detailReady = await page.waitForFunction(
+      () => /Produktbeschreibung|Preisdetails/i.test(document.body?.innerText ?? ''),
+      null,
+      { timeout: detailConfig.fieldTimeoutMs ?? detailConfig.navigationTimeoutMs }
+    ).then(() => true).catch(() => false);
+    if (!detailReady) return { skipped: false, error: 'KaufDA-Detailfelder wurden nicht sichtbar.' };
+    const fields = await page.evaluate(() => {
+      const lines = (document.body?.innerText ?? '').split(/\n+/).map((line) => line.trim()).filter(Boolean);
+      const productStart = lines.findIndex((line) => /^produktbeschreibung$/i.test(line));
+      const priceStart = lines.findIndex((line) => /^preisdetails$/i.test(line));
+      const noteStart = lines.findIndex((line) => /^irrtümer und änderungen vorbehalten/i.test(line));
+      const productEnd = productStart >= 0 ? (priceStart > productStart ? priceStart : lines.length) : -1;
+      const priceEnd = priceStart >= 0 ? (noteStart > priceStart ? noteStart : lines.length) : lines.length;
+      const productDescription = productStart >= 0
+        ? lines.slice(productStart + 1, productEnd).join(' ').replace(/\s+/g, ' ').trim()
+        : '';
+      const priceSection = lines.slice(priceStart >= 0 ? priceStart + 1 : 0, priceEnd);
+      const unitPriceLine = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
+      const priceLines = priceSection.filter((line) => /€/.test(line) && !unitPriceLine.test(line));
+      const discountLines = lines.filter((line) => /€/.test(line) && /sparen/i.test(line));
+      const priceText = [...new Set([...discountLines, ...priceLines])].join(' ');
+      const unitPriceText = priceSection.find((line) => unitPriceLine.test(line)) || '';
+      const priceLabel = priceSection.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis)$/i.test(line)) || null;
+      const validityText = lines.find((line) => /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) || '';
+      return { productDescription, priceText, priceLabel, unitPriceText, validityText };
+    });
+    return { skipped: false, ...fields };
+  } catch (error) {
+    return { skipped: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function enrichCardsFromDetails(page, cards, market, config, fetchedAt) {
+  const detailConfig = config.detail ?? DEFAULT_CONFIG.detail;
+  if (detailConfig.enabled === false) return { cards, attempted: 0, failed: 0 };
+  const candidates = cards
+    .map((raw) => ({ raw, initial: assessOffer(raw, market, config, fetchedAt) }))
+    .filter(({ raw, initial }) => {
+      const knownUncertainFoodName = initial.state === 'uncertain'
+        && termsFound(raw.name ?? '', config.classification.uncertainTerms).length > 0;
+      return initial.recognized && (initial.state === 'accepted' || knownUncertainFoodName) && productIdFromUrl(raw.sourceUrl);
+    });
+  if (!candidates.length) return { cards, attempted: 0, failed: 0 };
+
+  let cursor = 0;
+  let failed = 0;
+  const enriched = new Map();
+  const worker = async () => {
+    const detailPage = await page.context().newPage();
+    try {
+      while (true) {
+        const index = cursor++;
+        if (index >= candidates.length) break;
+        const { raw } = candidates[index];
+        const detail = await readKaufdaDetailSnapshot(detailPage, raw.sourceUrl, detailConfig);
+        if (detail.error) {
+          failed += 1;
+          continue;
+        }
+        const detailText = [detail.productDescription, detail.priceText, detail.unitPriceText, detail.validityText].filter(Boolean).join('\n');
+        enriched.set(rawCardKey(raw), {
+          ...raw,
+          productDescription: detail.productDescription || raw.productDescription || '',
+          priceText: detail.priceText || raw.priceText || '',
+          priceLabel: detail.priceLabel ?? raw.priceLabel ?? null,
+          unitPriceText: detail.unitPriceText || raw.unitPriceText || '',
+          validityText: detail.validityText || raw.validityText || '',
+          text: [raw.text, detailText].filter(Boolean).join('\n')
+        });
+      }
+    } finally {
+      await detailPage.close();
+    }
+  };
+  const workerCount = Math.min(Math.max(1, Number(detailConfig.concurrency) || 1), candidates.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return {
+    cards: cards.map((raw) => enriched.get(rawCardKey(raw)) ?? raw),
+    attempted: candidates.length,
+    failed
+  };
 }
 
 function rawCardKey(raw) {
@@ -622,11 +862,14 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   const visibleLocation = lastSnapshot.locationText ?? null;
   const expectedLocation = market.location ?? config.location;
   const locationStatus = matchVisibleLocation(visibleLocation, expectedLocation);
-  const assessments = [...rawCards.values()].map((raw) => assessOffer(raw, market, config, fetchedAt));
+  const detailScan = locationStatus === 'mismatch'
+    ? { cards: [...rawCards.values()], attempted: 0, failed: 0 }
+    : await enrichCardsFromDetails(page, [...rawCards.values()], market, config, fetchedAt);
+  const assessments = detailScan.cards.map((raw) => assessOffer(raw, market, config, fetchedAt));
   const scannedOffers = dedupeOffers(assessments.map((item) => item.offer).filter(Boolean));
   const offers = locationStatus === 'mismatch' ? [] : scannedOffers.map((offer) => locationStatus === 'matched'
     ? { ...offer, marketLocationStatus: 'matched' }
-    : { ...offer, marketLocationStatus: 'unknown', status: 'needs-review', reviewStatus: 'needs-review' });
+    : { ...offer, marketLocationStatus: 'unknown', planningStatus: 'needs-review', status: 'needs-review', reviewStatus: 'needs-review' });
   const reviewItems = assessments.map((item) => item.reviewItem).filter(Boolean).slice(0, config.maxReviewItems);
   const recognizedOfferCount = assessments.filter((item) => item.recognized).length;
   const uncertainCount = assessments.filter((item) => item.state === 'uncertain').length;
@@ -637,6 +880,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   const warnings = [];
   const errors = [];
   if (!lastSnapshot.cards.length) warnings.push('Keine sichtbaren Angebotskarten erkannt; KaufDA-Struktur möglicherweise geändert.');
+  if (detailScan.failed) warnings.push(`${detailScan.failed} Detailansichten konnten nicht gelesen werden; betroffene Felder bleiben prüfpflichtig.`);
   if (expectedCount == null) warnings.push('KaufDA-Zielzahl der Angebote war nicht sichtbar; Vollständigkeit ist nicht messbar.');
   if (expectedCountKind === 'prospect-pages') warnings.push(`KaufDA zeigt ${expectedCount} Prospektseiten; Seitenzahl und Kartenanzahl sind nicht vergleichbar.`);
   else if (expectedCount != null && !targetReached) warnings.push(`Zielzahl nicht erreicht: ${loadedCardCount}/${expectedCount} Karten.`);
@@ -722,7 +966,8 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         results.push(result);
         continue;
       }
-      const page = await browser.newPage({ locale: config.locale });
+      const context = await browser.newContext({ locale: config.locale });
+      const page = await context.newPage();
       try {
         await page.goto(market.url, { waitUntil: 'domcontentloaded', timeout: market.navigationTimeoutMs ?? 90000 });
         await page.waitForTimeout(market.initialWaitMs ?? 3500);
@@ -766,7 +1011,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         result.finishedAt = new Date().toISOString();
         results.push(result);
       } finally {
-        await page.close();
+        await context.close();
       }
     }
   } finally {
@@ -784,7 +1029,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
 
 export function buildOffersDocument({ config: configInput, results = [], offers = [], fetchedAt = new Date().toISOString() }) {
   const config = mergeConfig(configInput);
-  const normalizedOffers = dedupeOffers(offers);
+  const normalizedOffers = dedupeOffers(offers).map(selectPublishedOffer);
   const marketCount = results.length;
   const errorCount = results.filter((result) => (result.errors?.length ?? (result.error ? 1 : 0)) > 0).length;
   const incompleteMarketCount = results.filter((result) => result.completenessStatus !== 'complete').length;
@@ -841,11 +1086,50 @@ export function validateConfig(configInput) {
 export function validateOutputDocument(document) {
   const summary = document?.summary ?? {};
   const errors = [];
+  const offers = Array.isArray(document?.offers) ? document.offers : [];
+  const markets = Array.isArray(document?.markets) ? document.markets : [];
   if (!document || !Array.isArray(document.offers) || !Array.isArray(document.markets)) errors.push('Angebotsdokument ist unvollständig.');
-  if (!Number.isFinite(summary.foodOfferCount) || summary.foodOfferCount < 1) errors.push('Keine Lebensmittelangebote erkannt.');
+  if (document?.schemaVersion !== SCHEMA_VERSION) errors.push(`schemaVersion muss ${SCHEMA_VERSION} sein.`);
+  if (document?.contractVersion !== PWA_CONTRACT_VERSION) errors.push(`contractVersion muss ${PWA_CONTRACT_VERSION} sein.`);
+  if (!isValidTimestamp(document?.fetchedAt)) errors.push('fetchedAt muss ein gültiger ISO-Zeitstempel sein.');
+  if (!Number.isInteger(summary.marketCount) || summary.marketCount !== markets.length) errors.push('summary.marketCount stimmt nicht mit markets überein.');
+  if (!Number.isInteger(summary.foodOfferCount) || summary.foodOfferCount !== offers.length) errors.push('summary.foodOfferCount stimmt nicht mit offers überein.');
+  if (summary.foodOfferCount < 1) errors.push('Keine Lebensmittelangebote erkannt.');
+  const readyCount = offers.filter((offer) => offer?.planningStatus === 'ready').length;
+  const reviewCount = offers.filter((offer) => offer?.planningStatus !== 'ready').length;
+  if (!Number.isInteger(summary.planningReadyOfferCount) || summary.planningReadyOfferCount !== readyCount) errors.push('summary.planningReadyOfferCount stimmt nicht mit offers überein.');
+  if (!Number.isInteger(summary.planningReviewOfferCount) || summary.planningReviewOfferCount !== reviewCount) errors.push('summary.planningReviewOfferCount stimmt nicht mit offers überein.');
+  if (!['complete', 'incomplete', 'failed'].includes(summary.completenessStatus)) errors.push('summary.completenessStatus ist ungültig.');
+  const expectedPlanningStatus = !offers.length ? 'empty' : readyCount === offers.length ? 'complete' : 'partial';
+  if (summary.planningCompletenessStatus !== expectedPlanningStatus) errors.push('summary.planningCompletenessStatus stimmt nicht mit offers überein.');
   if (summary.completenessStatus === 'failed') errors.push('Alle Märkte sind fehlgeschlagen.');
+  const marketByKey = new Map(markets.map((market) => [market?.marketKey, market]));
+  offers.forEach((offer, index) => {
+    const prefix = `offers[${index}]`;
+    if (!offer || typeof offer !== 'object') {
+      errors.push(`${prefix} ist kein Objekt.`);
+      return;
+    }
+    if (!offer.id || !offer.product) errors.push(`${prefix} benötigt id und product.`);
+    if (!Number.isFinite(offer.price) || offer.price < 0) errors.push(`${prefix}.price ist ungültig.`);
+    if (!['verified', 'needs-review'].includes(offer.status)) errors.push(`${prefix}.status ist ungültig.`);
+    if (!['ready', 'needs-review'].includes(offer.planningStatus)) errors.push(`${prefix}.planningStatus ist ungültig.`);
+    if (offer.classification?.label !== 'food') errors.push(`${prefix} ist nicht als food klassifiziert.`);
+    if (!['matched', 'unknown'].includes(offer.marketLocationStatus)) errors.push(`${prefix}.marketLocationStatus ist nicht sicher.`);
+    if (!isKaufdaSourceUrl(offer.sourceUrl)) errors.push(`${prefix}.sourceUrl muss auf KaufDA zeigen.`);
+    if (!isValidTimestamp(offer.capturedAt) || !isValidTimestamp(offer.fetchedAt)) errors.push(`${prefix} benötigt gültige Zeitstempel.`);
+    if (!isValidDateOnly(offer.validFrom) || !isValidDateOnly(offer.validUntil)) errors.push(`${prefix} enthält ein ungültiges Gültigkeitsdatum.`);
+    const unexpectedFields = Object.keys(offer).filter((field) => !PUBLISHED_OFFER_FIELDS.includes(field));
+    if (unexpectedFields.length) errors.push(`${prefix} enthält nicht veröffentlichbare Felder: ${unexpectedFields.join(', ')}.`);
+    if (offer.planningStatus === 'ready' && (!offer.pack && !offer.packSize || offer.fieldStatus?.packSize !== 'visible' || offer.status !== 'verified' || offer.marketLocationStatus !== 'matched')) {
+      errors.push(`${prefix} darf nur mit Packung, verifiziertem Status und bestätigtem Marktstandort planningStatus=ready tragen.`);
+    }
+    if (offer.planningStatus !== 'ready' && offer.status === 'verified') errors.push(`${prefix} darf mit planningStatus=needs-review nicht verified sein.`);
+    if (offer.marketKey && marketByKey.get(offer.marketKey)?.locationStatus === 'mismatch') errors.push(`${prefix} verweist auf einen nicht passenden Marktstandort.`);
+  });
   const warnings = [];
   if (summary.completenessStatus === 'incomplete') warnings.push('Marktabdeckung ist unvollständig; planungsbereite Angebote bleiben trotzdem nutzbar.');
   if (summary.planningCompletenessStatus === 'partial') warnings.push('Ein Teil der Angebote benötigt noch eine Mengen-/Packungsprüfung.');
+  if (offers.length && readyCount === 0) warnings.push('Kein Angebot ist aktuell für eine automatische Planung freigegeben.');
   return { valid: errors.length === 0, errors, warnings };
 }
