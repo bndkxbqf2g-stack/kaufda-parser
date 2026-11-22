@@ -7,6 +7,25 @@
     "lat": 49.9016992,
     "lng": 9.812895
   },
+  "browser": {
+    "viewport": {
+      "width": 870,
+      "height": 675
+    },
+    "isMobile": false,
+    "hasTouch": false,
+    "deviceScaleFactor": 1
+  },
+  "offerCategory": "Lebensmittel und Getränke",
+  "offerCategoryMode": "include-all",
+  "imageOcr": {
+    "enabled": true,
+    "required": true,
+    "blockPlanning": false,
+    "language": "deu+eng",
+    "concurrency": 2,
+    "minConfidence": 20
+  },
   "markets": [
     {
       "key": "Lidl-Zellingen",

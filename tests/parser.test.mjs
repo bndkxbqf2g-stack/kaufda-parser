@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   assessOffer,
+  buildBrowserContextOptions,
   buildOffersDocument,
   classifyFood,
   dedupeOffers,
@@ -24,6 +25,7 @@ import {
   validateConfig,
   validateOutputDocument
 } from '../src/index.mjs';
+import { matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
 
 const fixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-visible-cards.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -33,6 +35,74 @@ const market = {
   store: 'Lidl',
   url: 'https://www.kaufda.de/search?query=Lidl&city=Zellingen&zip=97225'
 };
+
+test('Playwright-Lauf bleibt im einheitlichen KaufDA-Kartenlayout', () => {
+  const defaults = buildBrowserContextOptions(mergeConfig());
+  assert.deepEqual(defaults.viewport, { width: 870, height: 675 });
+  assert.equal(defaults.isMobile, false);
+  assert.equal(defaults.hasTouch, false);
+  assert.equal(defaults.deviceScaleFactor, 1);
+
+  const overridden = buildBrowserContextOptions(mergeConfig(), {
+    browser: { viewport: { width: 412, height: 915 }, hasTouch: false }
+  });
+  assert.deepEqual(overridden.viewport, { width: 412, height: 915 });
+  assert.equal(overridden.isMobile, false);
+  assert.equal(overridden.hasTouch, false);
+});
+
+test('Bild-OCR muss den Produktnamen global bestätigen', () => {
+  const verified = matchImageProductName({
+    cardName: 'Hackfleisch gemischt',
+    ocrText: 'Hackfleisch gemischt\nSchwein und Rind\n100g',
+    confidence: 72
+  });
+  assert.equal(verified.status, 'verified');
+  assert.equal(verified.imageProductName, 'Hackfleisch gemischt');
+
+  const unverified = matchImageProductName({
+    cardName: 'Paprika rot',
+    ocrText: 'Krombacher Bier\n24 x 0,33 l',
+    confidence: 72
+  });
+  assert.equal(unverified.status, 'unverified');
+  assert.equal(originalImageUrl('https://content-media.bonial.biz/id/main.jpg?impolicy=preview'), 'https://content-media.bonial.biz/id/main.jpg');
+});
+
+test('Ausgewählte KaufDA-Kategorie schließt unsichere Wortlisten nicht aus', () => {
+  const result = assessOffer({
+    cardId: 'category-card-1',
+    name: 'Superprodukt Alpha',
+    priceText: '2,49 €',
+    packSizeText: '500 g',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/category-card-1'
+  }, market, mergeConfig({
+    categoryScopeActive: true,
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: false, required: false }
+  }), '2026-11-22T19:32:52Z');
+  assert.equal(result.state, 'accepted');
+  assert.equal(result.offer.classification.label, 'uncertain');
+  assert.equal(result.offer.planningStatus, 'ready');
+});
+
+test('Kategorieangebote bleiben trotz OCR-Warnung und fehlender Menge planungsrelevant', () => {
+  const result = assessOffer({
+    cardId: 'category-warning-card',
+    name: 'Superprodukt Alpha',
+    priceText: '2,49 €',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/category-warning-card',
+    imageProductStatus: 'unverified'
+  }, market, mergeConfig({
+    categoryScopeActive: true,
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: true, required: true, blockPlanning: false }
+  }), '2026-11-22T19:32:52Z');
+  assert.equal(result.offer.fieldStatus.packSize, 'missing');
+  assert.equal(result.offer.fieldStatus.imageProduct, 'unverified');
+  assert.equal(result.offer.status, 'verified');
+  assert.equal(result.offer.planningStatus, 'ready');
+});
 
 test('parsePrice liest deutsche Angebotspreise inklusive Tausenderpunkt', () => {
   assert.equal(parsePrice('ab 2,29 €'), 2.29);
@@ -243,6 +313,31 @@ test('Dokument trennt Karten, erkannte Angebote, Lebensmittel und Prüfstatus', 
   assert.equal(document.summary.uncertainCount, 1);
   assert.equal(document.summary.targetReachedCount, 1);
   assert.equal(document.summary.completenessStatus, 'complete');
+  assert.equal(validateOutputDocument(document).valid, true);
+});
+
+test('Kategorieumfang darf klassifikatorisch unsichere Karten veröffentlichen', () => {
+  const scoped = assessOffer({
+    cardId: 'category-nonfood-looking-card',
+    name: 'Duftkerze Scandinavian Forest',
+    priceText: '4,99 €',
+    packSizeText: '1 Stück',
+    sourceUrl: 'https://www.kaufda.de/angebote/category-nonfood-looking-card'
+  }, market, mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' }), fixture.capturedAt);
+  const offer = { ...scoped.offer, marketLocationStatus: 'matched' };
+  const result = {
+    market: 'Lidl Zellingen',
+    marketKey: 'Lidl-Zellingen',
+    locationStatus: 'matched',
+    categoryScoped: true,
+    completenessStatus: 'complete',
+    errors: [],
+    offers: [offer],
+    reviewItems: []
+  };
+  const document = buildOffersDocument({ config: mergeConfig(), results: [result], offers: [offer], fetchedAt: fixture.capturedAt });
+  assert.equal(document.summary.offerScope, 'selected-category');
+  assert.equal(document.summary.categoryOfferCount, 1);
   assert.equal(validateOutputDocument(document).valid, true);
 });
 

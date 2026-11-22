@@ -34,6 +34,40 @@ Die Konfiguration enthält die gewünschten öffentlichen Suchseiten für:
 
 Die tatsächliche KaufDA-Quelle, der sichtbare Standort, die Entfernung und die Filialadresse werden pro Lauf im Marktstatus gespeichert. Eine konfigurierte Suchseite ist deshalb kein Beweis, dass in jedem Lauf eine passende Filiale oder ein vollständiger Prospekt geladen wurde. Das Ergebnis bleibt bei fehlendem Standortbezug unvollständig und wird nicht als vollständig ausgegeben.
 
+### Einheitlicher Kartenlauf
+
+Der Parser öffnet jede KaufDA-Quelle standardmäßig mit einer reproduzierbaren Browserbreite (`870 × 675`). In dieser Breite zeigt KaufDA vier gut lesbare Angebotskacheln nebeneinander. Nach dem Reiter **Angebote** wird zusätzlich die sichtbare Kategorie **Lebensmittel und Getränke** ausgewählt. Dadurch werden die Angebotskacheln über alle Märkte mit demselben Kartenlayout eingesammelt.
+
+Der gewählte Browserkontext bleibt während des kompletten Markt- und Detailansicht-Laufs aktiv; die Cloud-Browser-Simulation im Codex ist davon getrennt. Eine mobile Breite wie `430 × 932` kann pro Markt weiterhin getestet oder überschrieben werden. Wenn eine Quelle den Kategoriechip nicht anbietet, läuft die bestehende Lebensmittelklassifikation als Sicherheitsfilter weiter und der Marktstatus enthält eine sichtbare Warnung.
+
+Die globale Einstellung kann in `kaufda-parser.config.json` angepasst werden:
+
+```json
+{
+  "browser": {
+    "viewport": { "width": 870, "height": 675 },
+    "isMobile": false,
+    "hasTouch": false,
+    "deviceScaleFactor": 1
+  },
+  "offerCategory": "Lebensmittel und Getränke",
+  "offerCategoryMode": "include-all",
+  "imageOcr": {
+    "enabled": true,
+    "required": true,
+    "blockPlanning": false
+  }
+}
+```
+
+Ein einzelner Markt darf `browser` oder `offerCategory` überschreiben, wenn KaufDA dort eine abweichende Darstellung verwendet. Der Vergleich der EDEKA-Quelle zeigte bei `870 × 675` vier Kacheln mit ungefähr 197 Pixel Kartenbreite; `390 × 844` zeigte zwei schmalere Kacheln.
+
+Wenn die Kategorie **Lebensmittel und Getränke** erfolgreich ausgewählt wurde, ist sie der Umfangsfilter. Alle sichtbaren Karten mit Produkt und Preis werden als `offers` übernommen. Die Wortlistenklassifikation bleibt als `classification` und Qualitätswarnung erhalten, entfernt eine Karte in diesem Kategorieumfang aber nicht nochmals. Ist der Kategoriechip nicht verfügbar, fällt der Parser aus Sicherheitsgründen auf die Lebensmittelklassifikation zurück.
+
+Die Produktbezeichnung wird zusätzlich global aus dem Originalbild jeder Angebotskachel per lokaler OCR gelesen. Die kleine Rastervorschau wird dafür nicht verwendet; die `main.jpg`-Quelle wird ohne KaufDA-Login verarbeitet. Der sichtbare Kartenname wird über `fieldStatus.imageProduct` als `verified`, `unverified` oder `failed` dokumentiert. Im ausgewählten Kategorieumfang ist OCR standardmäßig nur eine Warnung (`blockPlanning: false`); die Karte bleibt planungsrelevant, wenn Produkt, Preis, Quelle und Marktstandort vorhanden sind. Im strengeren Fallback ohne Kategoriechip kann OCR weiterhin die Planung blockieren.
+
+Die OCR läuft lokal mit Tesseract.js im GitHub-Runner. Es werden keine Bilder an einen externen KI-Dienst übertragen. `fieldStatus.imageProduct` dokumentiert `verified`, `unverified`, `failed`, `missing` oder `not-required`; die technischen OCR-Texte und Bild-URLs werden nicht veröffentlicht.
+
 ## Angebotsvertrag für Vorratskompass
 
 Das aktuelle Format ist `kaufda-offers/v2` mit `contractVersion: vorratskompass-offers/v1`.
@@ -55,18 +89,18 @@ Zusätzliche Qualitätsfelder:
 
 - `fieldStatus`: getrennt sichtbare, fehlende oder mehrdeutige Werte für Produkt, Beschreibung, Preis, Packung, Grundpreis, Gültigkeit und Quelle;
 - `classification`: `food`, `nonfood` oder `uncertain` mit Gründen und Merkmalen;
-- `status`/`reviewStatus`: `verified` sobald Produkt, aktueller Angebotspreis und eindeutige Packungs-/Mengenangabe für die Planung vorliegen;
+- `status`/`reviewStatus`: `verified` sobald Produkt, aktueller Angebotspreis, Quelle und Marktstandort für die Kategorieplanung vorliegen; fehlende oder mehrdeutige Mengen bleiben über `fieldStatus.packSize` sichtbar;
 - `capturedAt`, `fetchedAt`, Markt, Quelle und Gültigkeitszeitraum;
 - `marketLocationStatus` sowie der Marktstatus mit sichtbarer Adresse, damit falsch aufgelöste KaufDA-Orte nicht in den PWA-Feed gelangen;
 - stabile IDs, die Markt, Quelle, Produkt, Preis, Packungsgröße und Gültigkeit berücksichtigen.
 - Preiszeilen werden semantisch getrennt: `price` ist der aktuelle Angebotspreis, `discountAmount` ein sichtbarer „sparen!“-Betrag und `basePrice`/`previousPrice` der durchgestrichene Regelpreis. Ein allein stehender `sparen!`-Betrag wird niemals als Angebotspreis veröffentlicht.
 - Relative Hinweise wie „Endet morgen“ werden anhand von `capturedAt` in ein absolutes `validUntil` überführt. Nach Ablauf fällt der Aktionspreis aus der aktiven Planung; ein gespeicherter durchgestrichener regulärer Preis bleibt als Normalpreis erhalten.
 
-Nichtlebensmittel und unklare Karten werden nicht als Lebensmittelangebote ausgegeben. Sie erscheinen stattdessen in `reviewItems` und in den Markt-Zählungen. Die Zusammenfassung unterscheidet ausdrücklich:
+Wenn der Kategoriechip erfolgreich ausgewählt wurde, werden auch Karten mit unsicherer Wortlistenklassifikation als Kategorieangebote veröffentlicht. `classification` dokumentiert diese Unsicherheit weiterhin; fehlende Pflichtfelder führen zu `planningStatus: needs-review`. Nur wenn KaufDA den Kategoriechip nicht anbietet, greift die strengere Lebensmittelklassifikation als Ausschlussfilter. Die Zusammenfassung unterscheidet ausdrücklich:
 
 - geladene KaufDA-Karten;
 - erkannte Karten mit Produkt und Preis;
-- übernommene Lebensmittelangebote;
+- übernommene Kategorieangebote aus „Lebensmittel und Getränke";
 - unsichere, verworfene und nicht erkennbare Einträge;
 - Fehler, Warnungen und `completenessStatus`.
 
@@ -86,7 +120,7 @@ Der verifizierte Live-Lauf der sichtbaren öffentlichen Seiten wurde am `2026-11
 | Netto Thüngersheim | Am Straßacker 1, 97291 Thüngersheim | 197 / 197 | 56 | 124 | 17 | 74 |
 | Kaufland Würzburg | Nürnberger Straße 12, 97076 Würzburg-Grombühl | 118 / 118 | 0 | 108 | 10 | 28 |
 
-Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittelangebote übernommen, 523 unsichere und 79 verworfene Karten. Kein Markt erreichte eine belastbare Kartenzielzahl; die Marktabdeckung bleibt deshalb `incomplete`. Davon sind 224 Angebote planungsbereit und 43 prüfpflichtig. Packungsgröße und Gültigkeit können bei anderen Karten `null` bleiben. `Kaufland Würzburg` lieferte in diesem Lauf keine als Lebensmittel bestätigten Angebote.
+Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittelangebote übernommen, 523 unsichere und 79 verworfene Karten. Dieser historische Lauf stammt noch aus der strengeren Klassifikationsstrecke vor dem Kategorieumfang. Kein Markt erreichte eine belastbare Kartenzielzahl; die Marktabdeckung bleibt deshalb `incomplete`. Davon sind 224 Angebote planungsbereit und 43 prüfpflichtig. Packungsgröße und Gültigkeit können bei anderen Karten `null` bleiben. `Kaufland Würzburg` lieferte in diesem Lauf keine als Lebensmittel bestätigten Angebote.
 
 ## Täglicher kostenloser Workflow
 
@@ -96,13 +130,14 @@ Der Workflow:
 
 1. installiert die Abhängigkeiten und führt die Unit-Tests aus;
 2. installiert Chromium für Playwright;
-3. liest die sichtbaren Karten und öffnet für erkannte Lebensmittelkandidaten die verlinkte öffentliche KaufDA-Detailansicht;
-4. übernimmt daraus ausschließlich die vereinbarten Produkt-, Beschreibungs-, Preis-, Mengen-, Grundpreis-, Gültigkeits-, Markt- und Quellenfelder;
-5. schreibt zunächst nach `generated/offers.next.json`;
-6. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
-7. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
-8. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
-9. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
+3. liest die sichtbaren Angebotskacheln im reproduzierbaren Browserlayout und bestätigt den Produktnamen zusätzlich per OCR aus dem Originalbild;
+4. öffnet für erkannte Kategorie-Karten die verlinkte öffentliche KaufDA-Detailansicht;
+5. übernimmt daraus ausschließlich die vereinbarten Produkt-, Beschreibungs-, Preis-, Mengen-, Grundpreis-, Gültigkeits-, Markt- und Quellenfelder;
+6. schreibt zunächst nach `generated/offers.next.json`;
+7. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
+8. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
+9. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
+10. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
 
 Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
 
@@ -116,7 +151,8 @@ Beim Import sollte die PWA:
 
 - nur `offers` lesen und `summary.completenessStatus`, `summary.planningCompletenessStatus` sowie `fetchedAt` sichtbar anzeigen;
 - ausschließlich `status: "verified"`, `planningStatus: "ready"` und `marketLocationStatus: "matched"` als automatische Planungsvorschläge verwenden;
-- alle anderen Angebote als `needs-review` behandeln und niemals automatisch in bestätigte Vorräte, Einkaufslisten oder Rezeptfreigaben übernehmen;
+- Angebote mit `planningStatus: needs-review` als `needs-review` behandeln und niemals automatisch in bestätigte Vorräte, Einkaufslisten oder Rezeptfreigaben übernehmen;
+- fehlende oder mehrdeutige Mengen sowie OCR-Warnungen sichtbar neben dem Planungsvorschlag anzeigen und nicht als bekannte Menge ergänzen;
 - `product`, `productDescription` und URLs als untrusted input behandeln, mit Textknoten statt `innerHTML` rendern und nur HTTPS-Links öffnen;
 - den zuletzt validierten Feed offline als last-known-good-Version behalten und bei veralteten Daten einen sichtbaren Hinweis anzeigen.
 

@@ -70,6 +70,28 @@ export const DEFAULT_CONFIG = {
   locale: 'de-DE',
   location: { city: '', zip: '', lat: null, lng: null },
   markets: [],
+  // KaufDA liefert auf der reproduzierbaren Browserbreite ein einheitliches
+  // Kartenraster mit gut lesbaren Angebotskacheln. Mobile Breiten bleiben pro
+  // Markt überschreibbar, sind aber nicht die Produktionsvoreinstellung.
+  browser: {
+    viewport: { width: 870, height: 675 },
+    isMobile: false,
+    hasTouch: false,
+    deviceScaleFactor: 1
+  },
+  offerCategory: 'Lebensmittel und Getränke',
+  // Nach erfolgreicher Auswahl des KaufDA-Kategoriechips ist die Kategorie
+  // der Umfangsfilter. Der Wortlisten-Klassifikator bleibt Qualitätsmetadatum
+  // und darf die sichtbaren Karten nicht nochmals aus dem Feed entfernen.
+  offerCategoryMode: 'include-all',
+  imageOcr: {
+    enabled: false,
+    required: false,
+    blockPlanning: true,
+    language: 'deu+eng',
+    concurrency: 2,
+    minConfidence: 20
+  },
   foodOnly: true,
   excludeTerms: DEFAULT_EXCLUDE_TERMS,
   classification: DEFAULT_CLASSIFICATION,
@@ -160,10 +182,18 @@ function termsFound(text, terms = []) {
 
 export function mergeConfig(input = {}) {
   const classification = input.classification ?? {};
+  const browser = input.browser ?? {};
+  const imageOcr = input.imageOcr ?? {};
   return {
     ...DEFAULT_CONFIG,
     ...input,
     location: { ...DEFAULT_CONFIG.location, ...(input.location ?? {}) },
+    browser: {
+      ...DEFAULT_CONFIG.browser,
+      ...browser,
+      viewport: { ...DEFAULT_CONFIG.browser.viewport, ...(browser.viewport ?? {}) }
+    },
+    imageOcr: { ...DEFAULT_CONFIG.imageOcr, ...imageOcr },
     scroll: { ...DEFAULT_CONFIG.scroll, ...(input.scroll ?? {}) },
     detail: { ...DEFAULT_CONFIG.detail, ...(input.detail ?? {}) },
     output: { ...DEFAULT_CONFIG.output, ...(input.output ?? {}) },
@@ -175,6 +205,24 @@ export function mergeConfig(input = {}) {
     excludeTerms: uniqueStrings([...DEFAULT_EXCLUDE_TERMS, ...(Array.isArray(input.excludeTerms) ? input.excludeTerms : [])]),
     markets: Array.isArray(input.markets) ? input.markets : []
   };
+}
+
+export function buildBrowserContextOptions(configInput = {}, market = {}) {
+  const config = mergeConfig(configInput);
+  const marketBrowser = market.browser ?? {};
+  const browser = {
+    ...config.browser,
+    ...marketBrowser,
+    viewport: { ...config.browser.viewport, ...(marketBrowser.viewport ?? {}) }
+  };
+  const options = {
+    locale: config.locale,
+    viewport: browser.viewport
+  };
+  for (const key of ['userAgent', 'isMobile', 'hasTouch', 'deviceScaleFactor', 'colorScheme', 'timezoneId']) {
+    if (browser[key] != null) options[key] = browser[key];
+  }
+  return options;
 }
 
 export async function loadConfig(filePath = 'kaufda-parser.config.json') {
@@ -472,9 +520,13 @@ function marketLabel(market) {
 
 export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt = new Date().toISOString()) {
   const config = configInput.classification ? configInput : mergeConfig(configInput);
+  const categoryScopeActive = config.categoryScopeActive === true && config.offerCategoryMode === 'include-all';
   const text = normalizeText(raw.text ?? [raw.name, raw.productDescription, raw.priceText, raw.packSizeText, raw.unitPriceText, raw.validityText].filter(Boolean).join('\n'));
   const lines = String(raw.text ?? text).split(/\r?\n/).map(normalizeText).filter(Boolean);
-  const name = chooseName(lines, raw.name);
+  const imageOcrRequired = config.imageOcr?.enabled === true && config.imageOcr?.required === true;
+  const imageOcrBlocksPlanning = imageOcrRequired && config.imageOcr?.blockPlanning === true;
+  const imageProductStatus = raw.imageProductStatus ?? (imageOcrRequired ? 'missing' : 'not-required');
+  const name = chooseName(lines, raw.imageProductStatus === 'verified' ? raw.imageProductName || raw.name : raw.name);
   const priceDetails = raw.priceDetails ?? parsePriceDetails(raw.priceText || text);
   const reportedPrice = raw.price == null ? null : Number(raw.price);
   const price = Number.isFinite(priceDetails.currentPrice) ? priceDetails.currentPrice : reportedPrice;
@@ -488,7 +540,8 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const classification = classifyFood(name ?? '', text, { ...config, includeTerms: market.includeTerms ?? config.includeTerms ?? [] });
   const recognized = Boolean(name && Number.isFinite(price));
   const fieldStatus = {
-    product: name ? 'visible' : 'missing',
+    product: name ? (imageOcrRequired && imageProductStatus !== 'verified' ? 'image-unverified' : 'visible') : 'missing',
+    imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
     price: Number.isFinite(price) ? 'visible' : 'missing',
     packSize: pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
@@ -501,13 +554,13 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   if (!name) reasons.push('Produktname fehlt.');
   if (!Number.isFinite(price)) reasons.push('Angebotspreis fehlt oder ist ungültig.');
   if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
-  if (recognized && classification.label === 'nonfood') {
+  if (recognized && !categoryScopeActive && classification.label === 'nonfood') {
     state = 'rejected';
     reasons.push(...classification.reasons);
-  } else if (recognized && classification.label === 'uncertain') {
+  } else if (recognized && !categoryScopeActive && classification.label === 'uncertain') {
     state = 'uncertain';
     reasons.push(...classification.reasons);
-  } else if (recognized && Number.isFinite(config.maxPrice) && price > config.maxPrice) {
+  } else if (recognized && !categoryScopeActive && Number.isFinite(config.maxPrice) && price > config.maxPrice) {
     state = 'rejected';
     reasons.push(`Preis über konfiguriertem Maximum (${config.maxPrice}).`);
   } else if (recognized) {
@@ -553,9 +606,11 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   // Für die Rezept- und Einkaufsplanung sind Produkt, aktueller Angebotspreis
   // und Packungs-/Mengenangabe die Pflichtangaben. Grundpreis und Gültigkeit
   // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
+  const packBlocksPlanning = !categoryScopeActive && (!pack.text || pack.value == null || pack.ambiguous);
   const planningReady = Boolean(
-    name && Number.isFinite(price) && pack.text && pack.value != null && !pack.ambiguous && validUrl(sourceUrl)
-    && classification.label === 'food' && classification.confidence === 'high'
+    name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl)
+    && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
+    && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
   );
   const complete = planningReady;
   const offer = {
@@ -699,6 +754,7 @@ async function readKaufdaSnapshot(page) {
       cards.push({
         cardId: sourceId || productId,
         sourceUrl,
+        imageUrl: item.image.currentSrc || item.image.src || null,
         text: item.text,
         name: explicitName,
         productDescription: productDescriptionText,
@@ -719,6 +775,26 @@ function productIdFromUrl(value) {
     return new URL(value).searchParams.get('productId');
   } catch (_) {
     return null;
+  }
+}
+
+async function activateOfferCategory(page, market, config) {
+  const label = market.offerCategory ?? config.offerCategory ?? null;
+  if (!label) return { label: null, status: 'not-configured' };
+
+  const category = page.getByText(label, { exact: true }).first();
+  if (!await category.count()) return { label, status: 'unavailable' };
+  try {
+    await category.scrollIntoViewIfNeeded().catch(() => {});
+    await category.click({ timeout: market.offerCategoryTimeoutMs ?? 10000 });
+    await page.waitForTimeout(market.afterOfferCategoryWaitMs ?? 1200);
+    return { label, status: 'selected' };
+  } catch (error) {
+    return {
+      label,
+      status: 'failed',
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -756,6 +832,34 @@ async function readKaufdaDetailSnapshot(page, sourceUrl, detailConfig) {
     return { skipped: false, ...fields };
   } catch (error) {
     return { skipped: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function enrichCardsFromImages(cards, config) {
+  const imageOcr = config.imageOcr ?? DEFAULT_CONFIG.imageOcr;
+  if (imageOcr.enabled !== true) {
+    return {
+      cards,
+      attempted: 0,
+      failed: 0,
+      verified: 0
+    };
+  }
+  try {
+    const { enrichCardsWithImageOcr } = await import('./image-ocr.mjs');
+    return await enrichCardsWithImageOcr(cards, imageOcr);
+  } catch (error) {
+    return {
+      cards: cards.map((card) => ({
+        ...card,
+        imageProductStatus: 'failed',
+        imageOcrError: error instanceof Error ? error.message : String(error)
+      })),
+      attempted: cards.length,
+      failed: cards.length,
+      verified: 0,
+      error: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -862,9 +966,12 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   const visibleLocation = lastSnapshot.locationText ?? null;
   const expectedLocation = market.location ?? config.location;
   const locationStatus = matchVisibleLocation(visibleLocation, expectedLocation);
+  const imageScan = locationStatus === 'mismatch'
+    ? { cards: [...rawCards.values()], attempted: 0, failed: 0, verified: 0 }
+    : await enrichCardsFromImages([...rawCards.values()], config);
   const detailScan = locationStatus === 'mismatch'
-    ? { cards: [...rawCards.values()], attempted: 0, failed: 0 }
-    : await enrichCardsFromDetails(page, [...rawCards.values()], market, config, fetchedAt);
+    ? { cards: imageScan.cards, attempted: 0, failed: 0 }
+    : await enrichCardsFromDetails(page, imageScan.cards, market, config, fetchedAt);
   const assessments = detailScan.cards.map((raw) => assessOffer(raw, market, config, fetchedAt));
   const scannedOffers = dedupeOffers(assessments.map((item) => item.offer).filter(Boolean));
   const offers = locationStatus === 'mismatch' ? [] : scannedOffers.map((offer) => locationStatus === 'matched'
@@ -872,19 +979,23 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
     : { ...offer, marketLocationStatus: 'unknown', planningStatus: 'needs-review', status: 'needs-review', reviewStatus: 'needs-review' });
   const reviewItems = assessments.map((item) => item.reviewItem).filter(Boolean).slice(0, config.maxReviewItems);
   const recognizedOfferCount = assessments.filter((item) => item.recognized).length;
-  const uncertainCount = assessments.filter((item) => item.state === 'uncertain').length;
-  const rejectedCount = assessments.filter((item) => item.state === 'rejected').length;
+  const categoryScopeActive = config.categoryScopeActive === true && config.offerCategoryMode === 'include-all';
+  const uncertainCount = assessments.filter((item) => item.classification?.label === 'uncertain').length;
+  const rejectedCount = assessments.filter((item) => item.classification?.label === 'nonfood' || item.state === 'rejected').length;
   const unrecognizedCount = assessments.filter((item) => item.state === 'unrecognized').length;
   const loadedCardCount = rawCards.size;
   const targetReached = Boolean(expectedCountKind !== 'prospect-pages' && expectedCount != null && expectedCount > 0 && loadedCardCount >= expectedCount && lastSnapshot.cards.length > 0);
   const warnings = [];
   const errors = [];
   if (!lastSnapshot.cards.length) warnings.push('Keine sichtbaren Angebotskarten erkannt; KaufDA-Struktur möglicherweise geändert.');
+  if (config.imageOcr?.enabled === true && imageScan.failed) warnings.push(`${imageScan.failed} Angebotsbilder konnten nicht per OCR gelesen werden; betroffene Produktnamen bleiben prüfpflichtig.`);
+  if (config.imageOcr?.enabled === true && imageScan.attempted && imageScan.verified < imageScan.attempted) warnings.push(`${imageScan.attempted - imageScan.verified} Angebotsbilder konnten den Produktnamen nicht sicher bestätigen.`);
   if (detailScan.failed) warnings.push(`${detailScan.failed} Detailansichten konnten nicht gelesen werden; betroffene Felder bleiben prüfpflichtig.`);
   if (expectedCount == null) warnings.push('KaufDA-Zielzahl der Angebote war nicht sichtbar; Vollständigkeit ist nicht messbar.');
   if (expectedCountKind === 'prospect-pages') warnings.push(`KaufDA zeigt ${expectedCount} Prospektseiten; Seitenzahl und Kartenanzahl sind nicht vergleichbar.`);
   else if (expectedCount != null && !targetReached) warnings.push(`Zielzahl nicht erreicht: ${loadedCardCount}/${expectedCount} Karten.`);
-  if (uncertainCount) warnings.push(`${uncertainCount} erkannte Karten bleiben wegen unsicherer Lebensmittelklassifikation in der Prüfung.`);
+  if (uncertainCount && categoryScopeActive) warnings.push(`${uncertainCount} Karten haben eine unsichere Wortlistenklassifikation; die ausgewählte KaufDA-Kategorie bleibt für den Angebotsumfang maßgeblich.`);
+  else if (uncertainCount) warnings.push(`${uncertainCount} erkannte Karten bleiben wegen unsicherer Lebensmittelklassifikation in der Prüfung.`);
   if (locationStatus === 'unknown') warnings.push('Sichtbarer Marktstandort fehlt oder konnte nicht sicher gelesen werden; Angebote bleiben prüfpflichtig.');
   if (locationStatus === 'mismatch') {
     const expectedLabel = [expectedLocation.city, expectedLocation.zip].filter(Boolean).join(' ');
@@ -901,7 +1012,12 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
     visibleLocation,
     expectedLocation,
     locationStatus,
+    categoryScoped: categoryScopeActive,
+    categoryOfferCount: offers.length,
     loadedCardCount,
+    imageOcrAttempted: imageScan.attempted,
+    imageOcrVerified: imageScan.verified,
+    imageOcrFailed: imageScan.failed,
     recognizedOfferCount,
     foodOfferCount: offers.length,
     uncertainCount,
@@ -924,6 +1040,10 @@ function buildMarketResult(market, config, startedAt) {
     store: market.store ?? marketLabel(market),
     location: market.location ?? config.location,
     sourceUrl: market.url ?? null,
+    offerCategory: market.offerCategory ?? config.offerCategory ?? null,
+    offerCategoryStatus: 'not-attempted',
+    categoryScoped: false,
+    categoryOfferCount: 0,
     fetchedAt: startedAt,
     startedAt,
     finishedAt: null,
@@ -931,6 +1051,9 @@ function buildMarketResult(market, config, startedAt) {
     expectedPageCount: null,
     expectedCountKind: null,
     loadedCardCount: 0,
+    imageOcrAttempted: 0,
+    imageOcrVerified: 0,
+    imageOcrFailed: 0,
     recognizedOfferCount: 0,
     foodOfferCount: 0,
     uncertainCount: 0,
@@ -966,7 +1089,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         results.push(result);
         continue;
       }
-      const context = await browser.newContext({ locale: config.locale });
+      const context = await browser.newContext(buildBrowserContextOptions(config, market));
       const page = await context.newPage();
       try {
         await page.goto(market.url, { waitUntil: 'domcontentloaded', timeout: market.navigationTimeoutMs ?? 90000 });
@@ -1002,7 +1125,20 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
           }
         }
         await activateOffersTab();
-        const scan = await collectOffersFromPage(page, market, config, expectedCountHint, expectedCountKindHint);
+        const categoryScan = await activateOfferCategory(page, market, config);
+        const pageConfig = {
+          ...config,
+          categoryScopeActive: categoryScan.status === 'selected'
+        };
+        const scan = await collectOffersFromPage(page, market, pageConfig, expectedCountHint, expectedCountKindHint);
+        scan.offerCategory = categoryScan.label;
+        scan.offerCategoryStatus = categoryScan.status;
+        scan.categoryScoped = pageConfig.categoryScopeActive;
+        if (categoryScan.status === 'unavailable') {
+          scan.warnings.push(`KaufDA-Kategorie „${categoryScan.label}“ war in dieser Ansicht nicht verfügbar; die Lebensmittelklassifikation bleibt als Sicherheitsfilter aktiv.`);
+        } else if (categoryScan.status === 'failed') {
+          scan.warnings.push(`KaufDA-Kategorie „${categoryScan.label}“ konnte nicht ausgewählt werden: ${categoryScan.error}`);
+        }
         Object.assign(result, scan);
         result.finishedAt = new Date().toISOString();
         results.push(result);
@@ -1038,6 +1174,8 @@ export function buildOffersDocument({ config: configInput, results = [], offers 
     marketSuccessCount: results.filter((result) => !(result.errors?.length ?? (result.error ? 1 : 0)) && result.completenessStatus !== 'failed').length,
     recognizedOfferCount: results.reduce((sum, result) => sum + (result.recognizedOfferCount ?? result.recognizedCount ?? 0), 0),
     foodOfferCount: normalizedOffers.length,
+    categoryOfferCount: normalizedOffers.length,
+    offerScope: results.some((result) => result.categoryScoped === true) ? 'selected-category' : 'food-classification',
     uncertainCount: results.reduce((sum, result) => sum + (result.uncertainCount ?? 0), 0),
     rejectedCount: results.reduce((sum, result) => sum + (result.rejectedCount ?? 0), 0),
     unrecognizedCount: results.reduce((sum, result) => sum + (result.unrecognizedCount ?? 0), 0),
@@ -1094,6 +1232,7 @@ export function validateOutputDocument(document) {
   if (!isValidTimestamp(document?.fetchedAt)) errors.push('fetchedAt muss ein gültiger ISO-Zeitstempel sein.');
   if (!Number.isInteger(summary.marketCount) || summary.marketCount !== markets.length) errors.push('summary.marketCount stimmt nicht mit markets überein.');
   if (!Number.isInteger(summary.foodOfferCount) || summary.foodOfferCount !== offers.length) errors.push('summary.foodOfferCount stimmt nicht mit offers überein.');
+  if (summary.categoryOfferCount != null && (!Number.isInteger(summary.categoryOfferCount) || summary.categoryOfferCount !== offers.length)) errors.push('summary.categoryOfferCount stimmt nicht mit offers überein.');
   if (summary.foodOfferCount < 1) errors.push('Keine Lebensmittelangebote erkannt.');
   const readyCount = offers.filter((offer) => offer?.planningStatus === 'ready').length;
   const reviewCount = offers.filter((offer) => offer?.planningStatus !== 'ready').length;
@@ -1114,15 +1253,16 @@ export function validateOutputDocument(document) {
     if (!Number.isFinite(offer.price) || offer.price < 0) errors.push(`${prefix}.price ist ungültig.`);
     if (!['verified', 'needs-review'].includes(offer.status)) errors.push(`${prefix}.status ist ungültig.`);
     if (!['ready', 'needs-review'].includes(offer.planningStatus)) errors.push(`${prefix}.planningStatus ist ungültig.`);
-    if (offer.classification?.label !== 'food') errors.push(`${prefix} ist nicht als food klassifiziert.`);
+    const categoryScoped = offer.marketKey != null && marketByKey.get(offer.marketKey)?.categoryScoped === true;
+    if (!categoryScoped && offer.classification?.label !== 'food') errors.push(`${prefix} ist nicht als food klassifiziert.`);
     if (!['matched', 'unknown'].includes(offer.marketLocationStatus)) errors.push(`${prefix}.marketLocationStatus ist nicht sicher.`);
     if (!isKaufdaSourceUrl(offer.sourceUrl)) errors.push(`${prefix}.sourceUrl muss auf KaufDA zeigen.`);
     if (!isValidTimestamp(offer.capturedAt) || !isValidTimestamp(offer.fetchedAt)) errors.push(`${prefix} benötigt gültige Zeitstempel.`);
     if (!isValidDateOnly(offer.validFrom) || !isValidDateOnly(offer.validUntil)) errors.push(`${prefix} enthält ein ungültiges Gültigkeitsdatum.`);
     const unexpectedFields = Object.keys(offer).filter((field) => !PUBLISHED_OFFER_FIELDS.includes(field));
     if (unexpectedFields.length) errors.push(`${prefix} enthält nicht veröffentlichbare Felder: ${unexpectedFields.join(', ')}.`);
-    if (offer.planningStatus === 'ready' && (!offer.pack && !offer.packSize || offer.fieldStatus?.packSize !== 'visible' || offer.status !== 'verified' || offer.marketLocationStatus !== 'matched')) {
-      errors.push(`${prefix} darf nur mit Packung, verifiziertem Status und bestätigtem Marktstandort planningStatus=ready tragen.`);
+    if (offer.planningStatus === 'ready' && (!categoryScoped && (!offer.pack && !offer.packSize || offer.fieldStatus?.packSize !== 'visible' || (offer.fieldStatus?.imageProduct != null && !['verified', 'not-required'].includes(offer.fieldStatus.imageProduct))) || offer.status !== 'verified' || offer.marketLocationStatus !== 'matched')) {
+      errors.push(`${prefix} darf nur mit gültigem Kernstatus und bestätigtem Marktstandort planningStatus=ready tragen; außerhalb des Kategorieumfangs sind Packung und Bildbestätigung zusätzlich Pflicht.`);
     }
     if (offer.planningStatus !== 'ready' && offer.status === 'verified') errors.push(`${prefix} darf mit planningStatus=needs-review nicht verified sein.`);
     if (offer.marketKey && marketByKey.get(offer.marketKey)?.locationStatus === 'mismatch') errors.push(`${prefix} verweist auf einen nicht passenden Marktstandort.`);

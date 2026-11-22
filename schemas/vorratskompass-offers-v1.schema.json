@@ -41,6 +41,8 @@
       "properties": {
         "marketCount": { "type": "integer", "minimum": 0 },
         "foodOfferCount": { "type": "integer", "minimum": 0 },
+        "categoryOfferCount": { "type": "integer", "minimum": 0 },
+        "offerScope": { "enum": ["selected-category", "food-classification"] },
         "planningReadyOfferCount": { "type": "integer", "minimum": 0 },
         "planningReviewOfferCount": { "type": "integer", "minimum": 0 },
         "completenessStatus": { "enum": ["complete", "incomplete", "failed"] },
@@ -55,6 +57,10 @@
         "required": ["marketKey", "locationStatus", "completenessStatus"],
         "properties": {
           "marketKey": { "type": ["string", "null"] },
+          "offerCategory": { "type": ["string", "null"] },
+          "offerCategoryStatus": { "enum": ["not-attempted", "selected", "unavailable", "failed"] },
+          "categoryScoped": { "type": "boolean" },
+          "categoryOfferCount": { "type": "integer", "minimum": 0 },
           "locationStatus": { "enum": ["matched", "unknown", "mismatch"] },
           "completenessStatus": { "enum": ["complete", "incomplete", "failed"] }
         },

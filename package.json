@@ -16,7 +16,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "playwright": "^1.55.0"
+    "playwright": "^1.55.0",
+    "tesseract.js": "^7.0.0"
   },
   "license": "MIT"
 }

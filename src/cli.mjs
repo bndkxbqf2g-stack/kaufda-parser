@@ -38,6 +38,9 @@ Beispiele:
 function exampleConfig(options) {
   return mergeConfig({
     location: { city: options.city ?? 'Zellingen', zip: options.zip ?? '97225' },
+    offerCategory: 'Lebensmittel und Getränke',
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: true, required: true, blockPlanning: false },
     markets: [{
       key: 'Aldi-Sued',
       store: 'ALDI SÜD',
@@ -73,7 +76,7 @@ permissions:
 jobs:
   update-offers:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -140,7 +143,8 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    console.log(`Angebotsdatei veröffentlichbar: ${document.summary.foodOfferCount} Lebensmittelangebote.`);
+    const label = document.summary.offerScope === 'selected-category' ? 'Kategorieangebote' : 'Lebensmittelangebote';
+    console.log(`Angebotsdatei veröffentlichbar: ${document.summary.foodOfferCount} ${label}.`);
     return;
   }
   if (command !== 'parse') return help();
