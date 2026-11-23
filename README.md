@@ -38,6 +38,8 @@ Die tatsächliche KaufDA-Quelle, der sichtbare Standort, die Entfernung und die 
 
 Der Parser öffnet jede KaufDA-Quelle standardmäßig mit einer reproduzierbaren Browserbreite (`870 × 675`). In dieser Breite zeigt KaufDA vier gut lesbare Angebotskacheln nebeneinander. Nach dem Reiter **Angebote** wird zusätzlich die sichtbare Kategorie **Lebensmittel und Getränke** ausgewählt. Dadurch werden die Angebotskacheln über alle Märkte mit demselben Kartenlayout eingesammelt.
 
+Wenn eine Suchseite mehrere Prospekte desselben Händlers liefert, wählt der Parser den aktuellen Treffer mit der Markierung **NEU** und kurzer Gültigkeit. Dadurch wird nicht versehentlich eine separate Online-/Nebenbroschüre geöffnet, die deutlich weniger oder andere Angebotskacheln enthalten kann.
+
 Der gewählte Browserkontext bleibt während des kompletten Markt- und Detailansicht-Laufs aktiv; die Cloud-Browser-Simulation im Codex ist davon getrennt. Eine mobile Breite wie `430 × 932` kann pro Markt weiterhin getestet oder überschrieben werden. Wenn eine Quelle den Kategoriechip nicht anbietet, läuft die bestehende Lebensmittelklassifikation als Sicherheitsfilter weiter und der Marktstatus enthält eine sichtbare Warnung.
 
 Die globale Einstellung kann in `kaufda-parser.config.json` angepasst werden:

@@ -234,6 +234,21 @@ export function normalizeText(value = '') {
   return String(value).replace(/\s+/g, ' ').trim();
 }
 
+// KaufDA kann für einen Händler mehrere Treffer liefern: zum Beispiel den
+// aktuellen Prospekt und eine separate Online-/Nebenbroschüre. Die aktuelle
+// Kachelansicht ist in der Regel als „NEU“ und mit einer kurzen Gültigkeit
+// markiert. Der Parser darf deshalb nicht blind den ersten Treffer öffnen.
+export function scoreKaufdaMarketResult(value = '') {
+  const text = normalizeText(value).toLocaleLowerCase('de-DE');
+  let score = 0;
+  if (/\bneu\b/u.test(text)) score += 1000;
+  if (/demnächst\s+gültig/u.test(text)) score -= 1000;
+  if (/\b\d+\s+tage\s+gültig/u.test(text)) score += 100;
+  if (/\b\d+\s+woche(?:n)?\s+gültig/u.test(text)) score -= 10;
+  if (/online|exklusive\s+angebote/u.test(text)) score -= 200;
+  return score;
+}
+
 function normalizeLocationText(value = '') {
   if (value == null) return '';
   return normalizeText(value)
@@ -1118,9 +1133,20 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
           return true;
         };
         if (/\/search(?:[/?]|$)/i.test(page.url())) {
-          const marketResult = page.getByRole('listitem').filter({ hasText: market.store ?? market.label ?? market.key }).first();
-          if (await marketResult.count()) {
-            await marketResult.click().catch(() => {});
+          const marketResults = page.getByRole('listitem').filter({ hasText: market.store ?? market.label ?? market.key });
+          const marketResultCount = await marketResults.count();
+          if (marketResultCount) {
+            let selectedIndex = 0;
+            let selectedScore = Number.NEGATIVE_INFINITY;
+            for (let index = 0; index < marketResultCount; index += 1) {
+              const candidateText = await marketResults.nth(index).innerText().catch(() => '');
+              const candidateScore = scoreKaufdaMarketResult(candidateText);
+              if (candidateScore > selectedScore) {
+                selectedIndex = index;
+                selectedScore = candidateScore;
+              }
+            }
+            await marketResults.nth(selectedIndex).click().catch(() => {});
             await page.waitForTimeout(market.afterMarketClickWaitMs ?? 5000);
           }
         }

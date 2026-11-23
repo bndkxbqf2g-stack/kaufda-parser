@@ -22,6 +22,7 @@ import {
   parsePriceDetails,
   parseUnitPrice,
   parseValidity,
+  scoreKaufdaMarketResult,
   validateConfig,
   validateOutputDocument
 } from '../src/index.mjs';
@@ -49,6 +50,14 @@ test('Playwright-Lauf bleibt im einheitlichen KaufDA-Kartenlayout', () => {
   assert.deepEqual(overridden.viewport, { width: 412, height: 915 });
   assert.equal(overridden.isMobile, false);
   assert.equal(overridden.hasTouch, false);
+});
+
+test('KaufDA wählt den aktuellen NEU-Prospekt statt einer Online-Nebenbroschüre', () => {
+  const online = 'Netto Marken-Discount\n1 Woche gültig';
+  const current = 'Netto Marken-Discount\n6 Tage gültig\n• NEU';
+  const upcoming = 'Netto Marken-Discount\n1 Woche gültig\n• DEMNÄCHST GÜLTIG';
+  assert.ok(scoreKaufdaMarketResult(current) > scoreKaufdaMarketResult(online));
+  assert.ok(scoreKaufdaMarketResult(online) > scoreKaufdaMarketResult(upcoming));
 });
 
 test('Bild-OCR muss den Produktnamen global bestätigen', () => {
