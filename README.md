@@ -110,6 +110,8 @@ Wenn der Kategoriechip erfolgreich ausgewählt wurde, werden auch Karten mit uns
 
 Wenn KaufDA nur eine Anzeige wie `1 / 37` liefert, wird sie als `targetPageCount` mit `expectedCountKind: prospect-pages` gespeichert. Prospektseiten werden niemals als Angebotskarten gezählt.
 
+Eine Weiterleitung auf den KaufDA-Einkaufshelfer oder eine Anmeldeseite sowie fehlende Händler-Suchergebnisse werden als Marktfehler gespeichert. Die Feed-Prüfung blockiert dann das Schreiben und die Veröffentlichung des gesamten neuen Laufs, damit ein teilweise ausgefallener Markt nicht unbemerkt durch einen verkleinerten Tagesfeed ersetzt wird. Der zuletzt veröffentlichte Feed bleibt bestehen, bis alle konfigurierten Märkte wieder erfolgreich gelesen werden.
+
 ## Belegter Live-Test
 
 Der verifizierte Live-Lauf der sichtbaren öffentlichen Seiten wurde am `2026-11-20T11:02:05Z` abgeschlossen. Alle fünf Quellen lieferten ohne Marktfehler einen sichtbaren Standort. Für erkannte Lebensmittelkandidaten wurden die verlinkten öffentlichen KaufDA-Detailansichten nachgeladen.

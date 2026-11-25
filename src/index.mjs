@@ -249,6 +249,17 @@ export function scoreKaufdaMarketResult(value = '') {
   return score;
 }
 
+export function kaufdaPageFailure(url = '') {
+  try {
+    const pathname = new URL(url).pathname.toLocaleLowerCase('de-DE');
+    if (/\/einkaufshelfer\/?$/.test(pathname)) return 'KaufDA hat die Suchanfrage auf den Einkaufshelfer umgeleitet; Angebotsdaten sind dort nicht verfügbar.';
+    if (/\/login|\/anmelden/.test(pathname)) return 'KaufDA hat auf eine Anmeldeseite umgeleitet; der öffentliche Angebotslauf wurde abgebrochen.';
+    return null;
+  } catch (_) {
+    return 'KaufDA hat eine ungültige Zieladresse geliefert.';
+  }
+}
+
 function normalizeLocationText(value = '') {
   if (value == null) return '';
   return normalizeText(value)
@@ -354,7 +365,8 @@ export function parseDate(value, referenceDate = new Date()) {
   const reference = new Date(referenceDate);
   const year = rawYear == null ? reference.getUTCFullYear() : rawYear < 100 ? 2000 + rawYear : rawYear;
   const date = new Date(Date.UTC(year, month - 1, day));
-  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date.toISOString().slice(0, 10);
 }
 
 export function parseValidity(value, referenceDate = new Date()) {
@@ -1109,6 +1121,8 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
       try {
         await page.goto(market.url, { waitUntil: 'domcontentloaded', timeout: market.navigationTimeoutMs ?? 90000 });
         await page.waitForTimeout(market.initialWaitMs ?? 3500);
+        const initialPageFailure = kaufdaPageFailure(page.url());
+        if (initialPageFailure) throw new Error(initialPageFailure);
         let expectedCountHint = null;
         let expectedCountKindHint = null;
         const rememberExpectedCount = async () => {
@@ -1135,21 +1149,22 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         if (/\/search(?:[/?]|$)/i.test(page.url())) {
           const marketResults = page.getByRole('listitem').filter({ hasText: market.store ?? market.label ?? market.key });
           const marketResultCount = await marketResults.count();
-          if (marketResultCount) {
-            let selectedIndex = 0;
-            let selectedScore = Number.NEGATIVE_INFINITY;
-            for (let index = 0; index < marketResultCount; index += 1) {
-              const candidateText = await marketResults.nth(index).innerText().catch(() => '');
-              const candidateScore = scoreKaufdaMarketResult(candidateText);
-              if (candidateScore > selectedScore) {
-                selectedIndex = index;
-                selectedScore = candidateScore;
-              }
+          if (!marketResultCount) throw new Error(`Kein KaufDA-Suchergebnis für „${market.store ?? market.label ?? market.key}“ gefunden; aktuelle Seite: ${page.url()}`);
+          let selectedIndex = 0;
+          let selectedScore = Number.NEGATIVE_INFINITY;
+          for (let index = 0; index < marketResultCount; index += 1) {
+            const candidateText = await marketResults.nth(index).innerText().catch(() => '');
+            const candidateScore = scoreKaufdaMarketResult(candidateText);
+            if (candidateScore > selectedScore) {
+              selectedIndex = index;
+              selectedScore = candidateScore;
             }
-            await marketResults.nth(selectedIndex).click().catch(() => {});
-            await page.waitForTimeout(market.afterMarketClickWaitMs ?? 5000);
           }
+          await marketResults.nth(selectedIndex).click();
+          await page.waitForTimeout(market.afterMarketClickWaitMs ?? 5000);
         }
+        const selectedPageFailure = kaufdaPageFailure(page.url());
+        if (selectedPageFailure) throw new Error(selectedPageFailure);
         await activateOffersTab();
         const categoryScan = await activateOfferCategory(page, market, config);
         const pageConfig = {
@@ -1183,6 +1198,8 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
   const offers = dedupeOffers(results.flatMap((result) => result.offers ?? []));
   const document = buildOffersDocument({ config, results, offers });
   if (outputPath) {
+    const validation = validateOutputDocument(document);
+    if (!validation.valid) throw new Error(`Angebotsdatei wird wegen fehlgeschlagener Markt-/Feed-Prüfung nicht geschrieben: ${validation.errors.join('; ')}`);
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
   }
@@ -1268,6 +1285,11 @@ export function validateOutputDocument(document) {
   const expectedPlanningStatus = !offers.length ? 'empty' : readyCount === offers.length ? 'complete' : 'partial';
   if (summary.planningCompletenessStatus !== expectedPlanningStatus) errors.push('summary.planningCompletenessStatus stimmt nicht mit offers überein.');
   if (summary.completenessStatus === 'failed') errors.push('Alle Märkte sind fehlgeschlagen.');
+  markets.forEach((market, index) => {
+    if (market?.completenessStatus === 'failed' || (Array.isArray(market?.errors) && market.errors.length > 0)) {
+      errors.push(`markets[${index}] (${market.market ?? market.marketKey ?? 'unbekannt'}) ist fehlgeschlagen; ein Teilfeed darf nicht veröffentlicht werden.`);
+    }
+  });
   const marketByKey = new Map(markets.map((market) => [market?.marketKey, market]));
   offers.forEach((offer, index) => {
     const prefix = `offers[${index}]`;
