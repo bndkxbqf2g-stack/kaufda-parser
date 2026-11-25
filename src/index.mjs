@@ -1100,8 +1100,21 @@ function buildMarketResult(market, config, startedAt) {
   };
 }
 
+export function assertSafeOutputTarget(configInput, outputPath, marketKey = null) {
+  if (!marketKey || !outputPath) return;
+  const config = mergeConfig(configInput);
+  if (!config.markets.some((market) => market.key === marketKey)) {
+    throw new Error(`Unbekannter Markt für Einzelmarktlauf: ${marketKey}`);
+  }
+  const configuredFeedPath = path.resolve(config.output.directory, config.output.file);
+  if (path.resolve(outputPath) === configuredFeedPath) {
+    throw new Error('Ein Einzelmarktlauf darf den konfigurierten Gesamtfeed nicht überschreiben. Für einen Test bitte einen abweichenden --output-Pfad angeben.');
+  }
+}
+
 export async function runParser(configInput, { outputPath = null, marketKey = null, headed = false } = {}) {
   const config = mergeConfig(configInput);
+  assertSafeOutputTarget(config, outputPath, marketKey);
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ headless: !headed });
   const results = [];
@@ -1142,7 +1155,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
           const fallbackTab = page.getByRole('button', { name: /^Angebote\s*(?:\(|\d|$)/i }).first();
           const tab = (await offersTab.count()) ? offersTab : fallbackTab;
           if (!await tab.count()) return false;
-          await tab.click().catch(() => {});
+          await tab.click();
           await page.waitForTimeout(market.afterOffersTabWaitMs ?? 2500);
           return true;
         };

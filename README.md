@@ -20,7 +20,7 @@ node src/cli.mjs parse --config kaufda-parser.config.json --output generated/off
 node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.json
 ```
 
-Für die sichtbare Fehlersuche kann `--headed` ergänzt werden. Ein einzelner Markt lässt sich mit `--market <key>` prüfen, ohne alle Märkte erneut zu starten.
+Für die sichtbare Fehlersuche kann `--headed` ergänzt werden. Ein einzelner Markt lässt sich mit `--market <key>` prüfen, ohne alle Märkte erneut zu starten. Bei einem Einzelmarktlauf muss `--output` auf einen separaten Testpfad zeigen; der konfigurierte Gesamtfeed kann so nicht versehentlich durch nur einen Markt ersetzt werden.
 
 ## Konfigurierte Bezugsquellen
 
@@ -68,7 +68,7 @@ Wenn die Kategorie **Lebensmittel und Getränke** erfolgreich ausgewählt wurde,
 
 Die Produktbezeichnung wird zusätzlich global aus dem Originalbild jeder Angebotskachel per lokaler OCR gelesen. Die kleine Rastervorschau wird dafür nicht verwendet; die `main.jpg`-Quelle wird ohne KaufDA-Login verarbeitet. Der sichtbare Kartenname wird über `fieldStatus.imageProduct` als `verified`, `unverified` oder `failed` dokumentiert. Im ausgewählten Kategorieumfang ist OCR standardmäßig nur eine Warnung (`blockPlanning: false`); die Karte bleibt planungsrelevant, wenn Produkt, Preis, Quelle und Marktstandort vorhanden sind. Im strengeren Fallback ohne Kategoriechip kann OCR weiterhin die Planung blockieren.
 
-Die OCR läuft lokal mit Tesseract.js im GitHub-Runner. Es werden keine Bilder an einen externen KI-Dienst übertragen. `fieldStatus.imageProduct` dokumentiert `verified`, `unverified`, `failed`, `missing` oder `not-required`; die technischen OCR-Texte und Bild-URLs werden nicht veröffentlicht.
+Die OCR läuft lokal mit Tesseract.js im GitHub-Runner. Es werden keine Bilder an einen externen KI-Dienst übertragen. Der Bildabruf akzeptiert ausschließlich HTTPS vom Bonial-Bildhost, prüft jede Weiterleitung erneut und begrenzt Laufzeit sowie Dateigröße. `fieldStatus.imageProduct` dokumentiert `verified`, `unverified`, `failed`, `missing` oder `not-required`; die technischen OCR-Texte und Bild-URLs werden nicht veröffentlicht.
 
 ## Angebotsvertrag für Vorratskompass
 
@@ -128,7 +128,7 @@ Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittel
 
 ## Täglicher kostenloser Workflow
 
-`.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC und kann zusätzlich manuell über **Actions → KaufDA-Angebote aktualisieren → Run workflow** gestartet werden.
+`.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC und kann zusätzlich manuell über **Actions → KaufDA-Angebote aktualisieren → Run workflow** gestartet werden. Codeänderungen starten keinen Live-Lauf und ändern den Angebotsfeed nicht automatisch.
 
 Der Workflow:
 
@@ -141,7 +141,7 @@ Der Workflow:
 7. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
 8. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
 9. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
-10. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
+10. veröffentlicht keinen Feed, wenn ein konfigurierter Markt vollständig fehlschlägt.
 
 Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
 

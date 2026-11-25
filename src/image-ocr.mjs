@@ -1,4 +1,8 @@
 const DEFAULT_MIN_CONFIDENCE = 20;
+const ALLOWED_IMAGE_HOSTS = new Set(['content-media.bonial.biz']);
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_REDIRECTS = 3;
+const IMAGE_FETCH_TIMEOUT_MS = 15_000;
 const IGNORED_TOKENS = new Set([
   'ab', 'angebot', 'aktion', 'auch', 'aus', 'je', 'kg', 'l', 'liter', 'ml',
   'packung', 'packungen', 'kasten', 'pfand', 'preis', 'sorten', 'verschiedene',
@@ -35,18 +39,73 @@ function looksLikeNoise(line) {
     || /^(?:angebot|aktion|preis|gültig|verschiedene sorten|versch\. sorten)$/i.test(line);
 }
 
-export function originalImageUrl(value) {
+function trustedImageUrl(value) {
   try {
     const url = new URL(value);
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
-    // KaufDA's grid policy returns a small preview. The path without the
-    // policy query is the public original image used for OCR.
-    url.search = '';
-    url.hash = '';
-    return url.href;
+    if (url.protocol !== 'https:'
+      || !ALLOWED_IMAGE_HOSTS.has(url.hostname.toLowerCase())
+      || url.username
+      || url.password
+      || (url.port && url.port !== '443')) return null;
+    return url;
   } catch (_) {
     return null;
   }
+}
+
+export function originalImageUrl(value) {
+  const url = trustedImageUrl(value);
+  if (!url) return null;
+  // KaufDA's grid policy returns a small preview. The path without the
+  // policy query is the public original image used for OCR.
+  url.search = '';
+  url.hash = '';
+  return url.href;
+}
+
+export async function fetchTrustedImage(value, { fetchImpl = globalThis.fetch, maxBytes = MAX_IMAGE_BYTES } = {}) {
+  let url = trustedImageUrl(originalImageUrl(value));
+  if (!url) throw new Error('OCR-Bildadresse ist nicht freigegeben.');
+
+  for (let redirects = 0; redirects <= MAX_IMAGE_REDIRECTS; redirects += 1) {
+    const response = await fetchImpl(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS)
+    });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      if (redirects === MAX_IMAGE_REDIRECTS) throw new Error('OCR-Bild hat zu viele Weiterleitungen.');
+      const location = response.headers.get('location');
+      const nextUrl = location ? trustedImageUrl(new URL(location, url).href) : null;
+      if (!nextUrl) throw new Error('OCR-Bild wurde auf einen nicht freigegebenen Host umgeleitet.');
+      url = nextUrl;
+      continue;
+    }
+    if (!response.ok) throw new Error(`OCR-Bildabruf fehlgeschlagen: HTTP ${response.status}.`);
+    const contentType = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+    if (!['image/avif', 'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/tiff', 'image/webp'].includes(contentType)) {
+      throw new Error('OCR-Antwort ist kein unterstütztes Rasterbild.');
+    }
+    const contentLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > maxBytes) throw new Error('OCR-Bild überschreitet die erlaubte Größe.');
+    if (!response.body) throw new Error('OCR-Bildantwort enthält keine Daten.');
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value: chunk } = await reader.read();
+      if (done) break;
+      totalBytes += chunk.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new Error('OCR-Bild überschreitet die erlaubte Größe.');
+      }
+      chunks.push(Buffer.from(chunk));
+    }
+    if (!totalBytes) throw new Error('OCR-Bildantwort ist leer.');
+    return Buffer.concat(chunks, totalBytes);
+  }
+  throw new Error('OCR-Bildabruf konnte nicht abgeschlossen werden.');
 }
 
 export function matchImageProductName({ cardName = '', ocrText = '', confidence = null, minConfidence = DEFAULT_MIN_CONFIDENCE } = {}) {
@@ -123,7 +182,8 @@ export async function enrichCardsWithImageOcr(cards = [], options = {}) {
           continue;
         }
         try {
-          const result = await worker.recognize(candidate.imageUrl);
+          const image = await fetchTrustedImage(candidate.imageUrl);
+          const result = await worker.recognize(image);
           const match = matchImageProductName({
             cardName: candidate.card.name,
             ocrText: result.data.text,
