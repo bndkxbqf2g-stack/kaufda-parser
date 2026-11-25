@@ -1,10 +1,10 @@
 # Übergabeprotokoll: kaufDA-Parser / Vorratskompass
 
-Stand: 20.11.2026  
-Lokaler Pfad: `C:\Users\Boool\kaufda-parser-github`  
+Stand: 25.11.2026  
+Lokaler Pfad: `/workspace/kaufda-parser`  
 GitHub: `https://github.com/bndkxbqf2g-stack/kaufda-parser`  
 Branch: `main`  
-Status: lokale Änderungen vorhanden, noch nicht committed oder gepusht.
+Status: Remote-`main` enthält PR #2 und PR #3; lokale Workspace-Kopie kann noch auf `f606788` stehen und Änderungen als uncommitted anzeigen. Vor weiteren Änderungen zuerst den Stand abgleichen und lokale Diffs bewahren.
 
 ## Ziel
 
@@ -25,30 +25,25 @@ Angebote sind ausschließlich Vorschläge. Sie dürfen nie automatisch als gekau
 4. JSON-Schema ergänzt: `schemas/vorratskompass-offers-v1.schema.json`.
 5. GitHub Actions gehärtet: Actions auf feste Commit-SHAs gepinnt, Konfiguration wird vor dem Live-Lauf validiert und Playwright wird mit `npx --no-install` gestartet.
 6. Regressionstests für Rabattzeilen, Geräteklassifikation und Vertragsfehler ergänzt.
-7. `generated/offers.json` nach dem Fix live neu erzeugt.
+7. Historischer Feed-Stand: `generated/offers.json` kann eine alte Ausgabe enthalten und ist erst nach erfolgreicher Verifikation ein aktueller Feed-Nachweis.
 8. Angebotsausgabe auf eine feste Feld-Whitelist begrenzt: sichtbare Produktbeschreibung, aktuelle/alte Preiswerte, Rabatt, Packung, Grundpreis, Gültigkeit sowie Markt-/Quellen- und Sicherheitsstatus; `rawText`, `imageUrl`, `category`, `priceEvidence` und internes `validity` werden nicht veröffentlicht.
 9. Mengen normalisiert: `10 x 20 g` wird als `200 g` mit `packCount: 10` ausgegeben; Varianten wie `40/45/55 g` bleiben `needs-review`.
+10. KaufDA-Weiterleitungen, fehlende Händlerergebnisse und fehlgeschlagene Marktaktionen werden als Fehler behandelt; Teilfeeds mit einem ausgefallenen Markt werden nicht geschrieben.
+11. Einzelmarktläufe dürfen `generated/offers.json` nicht überschreiben.
+12. OCR-Bilder werden nur über HTTPS vom freigegebenen Bonial-Bildhost geladen; Weiterleitungen, Antworttyp, Laufzeit und Größe sind begrenzt.
+13. Feed-Läufe starten über Zeitplan oder manuell, nicht durch Code-Pushes; Test-CI nutzt feste Action-SHAs und `npm ci`.
 
 ## Verifikation
 
-Alle Prüfungen waren erfolgreich:
+Stand 25.11.2026:
 
-- `npm test`: 18/18 Tests bestanden
-- `npm audit --include=dev`: 0 bekannte Schwachstellen
-- Konfigurationsprüfung: erfolgreich
-- Feed-Verifikation: erfolgreich, mit bewusst sichtbaren Qualitätswarnungen
-- Live-Lauf: 5 Märkte, 870 Karten, 267 Lebensmittelangebote, 0 Marktfehler
-- Rabattangebote mit falschem Rabattpreis: 0
-- zuvor gefundene Geräte-Fehlklassifikationen im Food-Feed: 0
-
-Der aktuelle Feed ist absichtlich nicht vollständig:
-
-- `completenessStatus`: `incomplete`
-- `targetReachedCount`: `0`
-- `planningReadyOfferCount`: `224`
-- `planningReviewOfferCount`: `43`
-
-Die verlinkten KaufDA-Detailansichten liefern für einen großen Teil der Angebote verlässliche Packungs-/Mengenangaben. Im aktuellen Feed sind 224 Angebote planungsbereit; 43 bleiben wegen fehlender oder mehrdeutiger Mengenangaben prüfpflichtig und dürfen nicht automatisch geplant werden.
+- `npm test`: erfolgreich; gezielte Regressionstests ebenfalls erfolgreich.
+- GitHub-Testworkflow für PR #3: erfolgreich.
+- Konfigurationsprüfung: erfolgreich, fünf Märkte.
+- Feed-Verifikation: **nicht erfolgreich**, weil `generated/offers.json` weiterhin den fehlgeschlagenen Markt `Kaufland Würzburg` enthält. Die Datei wurde in diesem Arbeitslauf nicht geändert; aktueller Blob-SHA: `89206af7ce2e7b98e7c2a8e74817e5e6bb51a596`.
+- Workflow #45525048828 wurde am 25.11. um 01:44 UTC abgebrochen; der Feed blieb unverändert.
+- Ein vorheriger Feature-Branch-Lauf konnte fünf Märkte parsen und den Feed verifizieren, aber der anschließende Push scheiterte mit `fetch first`; das erzeugte Ergebnis wurde nicht veröffentlicht.
+- `npm audit --include=dev` konnte wegen einer vom Netzwerkproxy abgewiesenen Anfrage an `registry.npmjs.org` (403 `Domain forbidden`) nicht abgeschlossen werden. Es gibt daher keinen aktuellen Audit-Nachweis.
 
 ## Vorratskompass-Importregeln
 
@@ -76,18 +71,18 @@ Die PWA soll:
 
 Die eigentliche Vorratskompass-PWA ist nicht in diesem Repository enthalten. Der öffentliche Auftritt unter `https://vorratskompass.de/` verweist derzeit auf App Store und Google Play. Für ein vollständiges PWA-Audit oder Änderungen an Service Worker, Manifest, Offline-Cache, UI und App-API wird das separate PWA-Repository oder die konkrete App-URL benötigt.
 
-## Empfohlene nächste Schritte im neuen Chat
+## Empfohlene nächste Schritte
 
-1. Dieses Protokoll vollständig übernehmen.
-2. Das separate Vorratskompass-PWA-Repository oder die App-URL verbinden.
-3. Zuerst `git diff`, `npm test` und `node src/cli.mjs verify --input generated/offers.json` ausführen.
-4. Die PWA-Importstrecke gegen das JSON-Schema und die oben genannten Sicherheitsregeln prüfen.
-5. Nach Review der Änderungen einen Commit erstellen und erst danach nach GitHub pushen.
+1. Lokale Workspace-Kopie mit Remote-Branch `main` abgleichen; lokale Änderungen bewahren.
+2. Die nächste reguläre Angebotsausführung beobachten. Ein manueller Lauf, der `generated/offers.json` ersetzt, braucht eine ausdrückliche Freigabe.
+3. Feed nur akzeptieren, wenn `node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.json` erfolgreich ist.
+4. Abhängigkeitsaudit erneut ausführen, sobald `registry.npmjs.org` aus der Umgebung erreichbar ist.
+5. Für ein PWA-Audit das separate Vorratskompass-PWA-Repository verbinden.
 
 ## Lokale Prüfkommandos
 
-```powershell
-cd C:\Users\Boool\kaufda-parser-github
+```sh
+cd /workspace/kaufda-parser
 npm ci
 npm test
 node src/cli.mjs validate --config kaufda-parser.config.json
