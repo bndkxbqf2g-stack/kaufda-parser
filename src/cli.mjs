@@ -57,14 +57,6 @@ on:
   schedule:
     # Täglich 05:15 UTC.
     - cron: '15 5 * * *'
-  push:
-    paths:
-      - 'kaufda-parser.config.json'
-      - 'src/**'
-      - 'tests/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/kaufda-offers.yml'
 
 concurrency:
   group: kaufda-offers

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   assessOffer,
+  assertSafeOutputTarget,
   buildBrowserContextOptions,
   buildOffersDocument,
   classifyFood,
@@ -27,7 +28,7 @@ import {
   validateConfig,
   validateOutputDocument
 } from '../src/index.mjs';
-import { matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
+import { fetchTrustedImage, matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
 
 const fixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-visible-cards.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -83,6 +84,45 @@ test('Bild-OCR muss den Produktnamen global bestätigen', () => {
   });
   assert.equal(unverified.status, 'unverified');
   assert.equal(originalImageUrl('https://content-media.bonial.biz/id/main.jpg?impolicy=preview'), 'https://content-media.bonial.biz/id/main.jpg');
+  assert.equal(originalImageUrl('http://content-media.bonial.biz/id/main.jpg'), null);
+  assert.equal(originalImageUrl('https://content-media.bonial.biz.attacker.test/id/main.jpg'), null);
+  assert.equal(originalImageUrl('https://content-media.bonial.biz:8443/id/main.jpg'), null);
+  assert.equal(originalImageUrl('https://user@content-media.bonial.biz/id/main.jpg'), null);
+});
+
+test('OCR-Bildabruf begrenzt Weiterleitungen, Inhaltstyp und Größe', async () => {
+  const requestedUrls = [];
+  const image = await fetchTrustedImage('https://content-media.bonial.biz/id/main.jpg?impolicy=preview', {
+    fetchImpl: async (url, options) => {
+      requestedUrls.push({ url: url.href, redirect: options.redirect });
+      if (requestedUrls.length === 1) return new Response(null, { status: 302, headers: { location: '/id/original.jpg' } });
+      return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg', 'content-length': '3' } });
+    }
+  });
+  assert.deepEqual(Array.from(image), [1, 2, 3]);
+  assert.deepEqual(requestedUrls, [
+    { url: 'https://content-media.bonial.biz/id/main.jpg', redirect: 'manual' },
+    { url: 'https://content-media.bonial.biz/id/original.jpg', redirect: 'manual' }
+  ]);
+
+  await assert.rejects(fetchTrustedImage('https://content-media.bonial.biz/id/main.jpg', {
+    fetchImpl: async () => new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/admin' } })
+  }), /nicht freigegebenen Host/);
+  let redirectCount = 0;
+  await assert.rejects(fetchTrustedImage('https://content-media.bonial.biz/id/main.jpg', {
+    fetchImpl: async () => {
+      redirectCount += 1;
+      return new Response(null, { status: 302, headers: { location: `/id/redirect-${redirectCount}.jpg` } });
+    }
+  }), /zu viele Weiterleitungen/);
+  assert.equal(redirectCount, 4);
+  await assert.rejects(fetchTrustedImage('https://content-media.bonial.biz/id/main.jpg', {
+    maxBytes: 2,
+    fetchImpl: async () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } })
+  }), /erlaubte Größe/);
+  await assert.rejects(fetchTrustedImage('https://content-media.bonial.biz/id/main.jpg', {
+    fetchImpl: async () => new Response('<html/>', { headers: { 'content-type': 'text/html' } })
+  }), /kein unterstütztes Rasterbild/);
 });
 
 test('Ausgewählte KaufDA-Kategorie schließt unsichere Wortlisten nicht aus', () => {
@@ -408,6 +448,19 @@ test('Teilfeed mit komplett ausgefallenem Markt wird nicht veröffentlicht', () 
   const validation = validateOutputDocument(document);
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(' '), /Kaufland Würzburg.*fehlgeschlagen/);
+});
+
+test('Einzelmarktlauf darf den konfigurierten Gesamtfeed nicht überschreiben', () => {
+  const config = mergeConfig({
+    output: { directory: 'generated', file: 'offers.json' },
+    markets: [{ ...market, key: 'Lidl-Zellingen' }]
+  });
+  assert.throws(
+    () => assertSafeOutputTarget(config, path.resolve('generated/offers.json'), 'Lidl-Zellingen'),
+    /Einzelmarktlauf darf den konfigurierten Gesamtfeed nicht überschreiben/
+  );
+  assert.doesNotThrow(() => assertSafeOutputTarget(config, path.resolve('tmp/lidl.json'), 'Lidl-Zellingen'));
+  assert.throws(() => assertSafeOutputTarget(config, path.resolve('tmp/lidl.json'), 'missing-market'), /Unbekannter Markt/);
 });
 
 test('Konfiguration wird verständlich validiert', () => {

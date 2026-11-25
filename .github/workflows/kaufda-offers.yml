@@ -6,14 +6,6 @@ on:
     # Täglich 05:15 UTC. Der Lauf bleibt begrenzt und veröffentlicht den
     # Vollständigkeitsstatus zusammen mit den Angeboten.
     - cron: '15 5 * * *'
-  push:
-    paths:
-      - 'kaufda-parser.config.json'
-      - 'src/**'
-      - 'tests/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/kaufda-offers.yml'
 
 concurrency:
   group: kaufda-offers
