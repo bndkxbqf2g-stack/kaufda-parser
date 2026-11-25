@@ -11,6 +11,7 @@ import {
   dedupeOffers,
   extractPriceText,
   isLikelyFood,
+  kaufdaPageFailure,
   mergeConfig,
   matchVisibleLocation,
   normalizeOffer,
@@ -58,6 +59,12 @@ test('KaufDA wählt den aktuellen NEU-Prospekt statt einer Online-Nebenbroschür
   const upcoming = 'Netto Marken-Discount\n1 Woche gültig\n• DEMNÄCHST GÜLTIG';
   assert.ok(scoreKaufdaMarketResult(current) > scoreKaufdaMarketResult(online));
   assert.ok(scoreKaufdaMarketResult(online) > scoreKaufdaMarketResult(upcoming));
+});
+
+test('KaufDA-Fehlweiterleitungen werden als Quellenfehler erkannt', () => {
+  assert.match(kaufdaPageFailure('https://www.kaufda.de/einkaufshelfer?city=Zellingen'), /Einkaufshelfer umgeleitet/);
+  assert.match(kaufdaPageFailure('https://www.kaufda.de/anmelden'), /Anmeldeseite/);
+  assert.equal(kaufdaPageFailure('https://www.kaufda.de/contentViewer/static/example'), null);
 });
 
 test('Bild-OCR muss den Produktnamen global bestätigen', () => {
@@ -173,6 +180,8 @@ test('Packungsgröße, Grundpreis und Gültigkeit bleiben getrennt', () => {
     validFrom: '2026-11-16', validUntil: '2026-11-21', status: 'complete', text: 'Gültig vom 16.11.2026 bis 21.11.2026'
   });
   assert.equal(parseDate('gültig bis 07.11.2026'), '2026-11-07');
+  assert.equal(parseDate('gültig bis 31.02.2026'), null);
+  assert.equal(parseDate('gültig bis 00.11.2026'), null);
   assert.equal(parseValidity('Gültig bis 21.11.').status, 'partial');
   const card = assessOffer({
     name: 'Kaffee Prodomo',
@@ -383,6 +392,22 @@ test('Ausgabevertrag lehnt falsche Versionen und inkonsistente Summen ab', () =>
   assert.equal(invalid.valid, false);
   assert.match(invalid.errors.join(' '), /schemaVersion/);
   assert.match(invalid.errors.join(' '), /foodOfferCount/);
+});
+
+test('Teilfeed mit komplett ausgefallenem Markt wird nicht veröffentlicht', () => {
+  const offer = { ...normalizeOffer(fixture.cards[0], market, mergeConfig()), marketLocationStatus: 'matched' };
+  const document = buildOffersDocument({
+    config: mergeConfig(),
+    results: [
+      { market: 'Lidl', marketKey: 'Lidl', locationStatus: 'matched', completenessStatus: 'complete', errors: [], offers: [offer], reviewItems: [] },
+      { market: 'Kaufland Würzburg', marketKey: 'Kaufland-Wuerzburg', locationStatus: 'unknown', completenessStatus: 'failed', errors: ['Einkaufshelfer Redirect'], offers: [], reviewItems: [] }
+    ],
+    offers: [offer],
+    fetchedAt: fixture.capturedAt
+  });
+  const validation = validateOutputDocument(document);
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /Kaufland Würzburg.*fehlgeschlagen/);
 });
 
 test('Konfiguration wird verständlich validiert', () => {
