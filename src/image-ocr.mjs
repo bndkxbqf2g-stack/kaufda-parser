@@ -63,6 +63,28 @@ export function originalImageUrl(value) {
   return url.href;
 }
 
+export async function createImageTextReader(options = {}) {
+  const { createWorker } = await import('tesseract.js');
+  const worker = await createWorker(options.language ?? 'deu+eng', 1, { logger: () => {} });
+  return {
+    async recognize(image) {
+      const result = await worker.recognize(image);
+      return (result.data.lines ?? []).map((line) => ({
+        text: normalize(line.text),
+        confidence: Number.isFinite(Number(line.confidence)) ? Number(line.confidence) : null,
+        box: line.bbox ? {
+          x: line.bbox.x0,
+          y: line.bbox.y0,
+          width: line.bbox.x1 - line.bbox.x0,
+          height: line.bbox.y1 - line.bbox.y0
+        } : null
+      })).filter((line) => line.text && line.box);
+    },
+    async close() {
+      await worker.terminate();
+    }
+  };
+}
 export async function fetchTrustedImage(value, { fetchImpl = globalThis.fetch, maxBytes = MAX_IMAGE_BYTES } = {}) {
   let url = trustedImageUrl(originalImageUrl(value));
   if (!url) throw new Error('OCR-Bildadresse ist nicht freigegeben.');
@@ -125,11 +147,13 @@ export function matchImageProductName({ cardName = '', ocrText = '', confidence 
     const overlap = visibleTokens.length
       ? visibleTokens.filter((token) => lineTokens.some((candidate) => candidate === token || candidate.startsWith(token) || token.startsWith(candidate))).length / visibleTokens.length
       : 0;
-    const score = overlap + Math.min(0.2, 1 / Math.max(1, lineTokens.length));
+    const score = overlap + (visibleTokens.length
+      ? Math.min(0.2, 1 / Math.max(1, lineTokens.length))
+      : Math.min(0.6, lineTokens.length / 5));
     if (!best || score > best.score) best = { line, overlap, score };
   }
 
-  if (best && confidenceOkay && ((visibleTokens.length > 0 && best.overlap >= 0.5) || (!visibleTokens.length && best.line.length >= 3))) {
+  if (best && confidenceOkay && ((visibleTokens.length > 0 && best.overlap >= 0.5) || (!visibleTokens.length && tokens(best.line).length >= 2))) {
     return {
       status: 'verified',
       imageProductName: visibleName || best.line,

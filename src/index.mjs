@@ -12,11 +12,12 @@ export const PWA_CONTRACT_VERSION = 'vorratskompass-offers/v1';
 export const PUBLISHED_OFFER_FIELDS = Object.freeze([
   'id', 'product', 'productDescription',
   'market', 'marketKey', 'store', 'marketLocationStatus',
-  'price', 'priceLabel', 'currency', 'discountAmount', 'basePrice', 'previousPrice', 'priceType',
-  'pack', 'packSize', 'packSizeValue', 'packSizeUnit', 'packCount',
+  'price', 'priceLabel', 'currency', 'discountAmount', 'discountPercent', 'basePrice', 'previousPrice', 'priceType',
+  'priceBasis', 'activationRequired', 'pack', 'packSize', 'packSizeValue', 'packSizeUnit', 'packCount',
+  'loyaltyPrice', 'loyaltyProgram', 'loyaltyActivationRequired', 'loyaltyPointsRequired', 'minimumPurchaseAmount', 'purchaseLimitText',
   'unitPrice', 'unitPriceUnit', 'unitPriceText',
   'validFrom', 'validUntil', 'validTo',
-  'sourceUrl', 'source', 'sourceId', 'capturedAt', 'fetchedAt',
+  'sourceUrl', 'sourcePage', 'source', 'sourceId', 'capturedAt', 'fetchedAt', 'evidence',
   'classification', 'fieldStatus',
   'status', 'reviewStatus', 'planningStatus'
 ]);
@@ -114,13 +115,13 @@ export const DEFAULT_CONFIG = {
 };
 
 const PRICE_RE = /(?:ab\s*)?((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/i;
-const DATE_TOKEN = '(\\d{1,2}\\.\\d{1,2}(?:\\.\\d{2,4})?)';
+const DATE_TOKEN = '(\\d{1,2}\\.\\d{1,2}(?:\\.\\d{2,4})?\\.?)';
 const DATE_RE = new RegExp(`(?:gültig|gültigkeit)(?:\\s+bis)?\\s*[:\\-]?\\s*${DATE_TOKEN}`, 'i');
 const RANGE_RE = new RegExp(`${DATE_TOKEN}\\s*(?:-|–|bis)\\s*${DATE_TOKEN}`, 'i');
-const PACK_RE = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
+const PACK_RE = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung(?:en)?)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
 const PACK_RANGE_RE = /((?:\d+(?:[,.]\d+)?\s*[-–]\s*,?\s*(?:bzw\.?\s*)?)+\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|packung|packg\.?|portion(?:en)?)(?:\s*[- ]?(?:packung|packg\.?))?)/i;
-const UNIT_PRICE_RE = /(?:1\s*)?(kg|g|l|ml|cl|stück|stk\.?)\s*=\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€?/i;
-const UNIT_PRICE_LINE_RE = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
+const UNIT_PRICE_RE = /(?:1\s*)?(kg|g|l|ml|cl|stück|stk\.?)\s*=\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€?|((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€\s*\/\s*(100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)/i;
+const UNIT_PRICE_LINE_RE = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|€\s*\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|je\s+(?:100\s*(?:g|ml)|kg|g|l|ml|cl|liter|stück))/i;
 
 function uniqueStrings(values = []) {
   return [...new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean))];
@@ -303,7 +304,16 @@ export function extractPriceText(lines = []) {
 }
 
 export function parsePriceDetails(value) {
-  const text = normalizeText(value);
+  const text = normalizeText(String(value)
+    .replace(/(?:für\s+mind(?:estens)?\.?|mindesteinkaufs?(?:wert)?\s*:?)\s*(?:ab\s*)?\d{1,3}(?:[,.]\d{1,2})?\s*(?:€|euro)(?:\s*(?:einkauf|einkaufswert))?/gi, ' ')
+    .split(/\r?\n+/).map((line) => {
+    if (UNIT_PRICE_LINE_RE.test(line) && /(?:€\s*\/|\/\s*100\s*(?:g|ml)|\b(?:kg|l)\s*=)/i.test(line)) {
+      return line
+        .replace(/(?:1\s*)?(?:kg|g|l|ml|cl|stück|stk\.?)\s*=\s*(?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?\s*€?/gi, '')
+        .replace(/(?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?\s*€\s*\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)\b/gi, '');
+    }
+    return UNIT_PRICE_LINE_RE.test(line) ? '' : line;
+  }).filter(Boolean).join(' '));
   const candidates = [...text.matchAll(/((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/gi)]
     .map((match) => ({ value: parseGermanNumber(match[1]), index: match.index ?? 0 }))
     .filter((entry) => entry.value != null);
@@ -341,6 +351,47 @@ export function parsePriceDetails(value) {
   };
 }
 
+function isKauflandMarket(market = {}) {
+  return market.interpretationProfile === 'kaufland-v1'
+    || /kaufland/i.test(`${market.key ?? ''} ${market.store ?? ''} ${market.label ?? ''}`);
+}
+
+function parseKauflandConditions(value = '') {
+  const text = normalizeText(value);
+  const xtraPricePatterns = [
+    /\bxtra\b[^\d€]{0,24}((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/i,
+    /((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€[^\d€]{0,24}\bxtra\b/i
+  ];
+  let loyaltyPrice = null;
+  let loyaltyPriceText = null;
+  for (const pattern of xtraPricePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      loyaltyPrice = parseGermanNumber(match[1]);
+      loyaltyPriceText = match[0];
+      break;
+    }
+  }
+  const points = text.match(/\b(\d+)\s*(?:xtra[- ]?)?(?:punkte|münzen)\b/i);
+  const percent = text.match(/(?:−|–|-)?\s*(\d{1,2})\s*(?:%|prozent)/i);
+  const minimum = text.match(/(?:für\s+mind(?:estens)?\.?|mindesteinkaufs?(?:wert)?\s*:?)\s*(\d{1,3}(?:[,.]\d{1,2})?)\s*(?:€|euro)(?:\s*(?:einkauf|einkaufswert))?/i);
+  const limit = text.match(/\b(?:max(?:imal)?\.?\s*)(\d+)\s*(kartons?|packungen?|flaschen?|stück|stk\.?|gläser?|dosen?)\b(?:\s*(?:pro|je)\s*(?:kunde|endverbraucher))?/i);
+  const loyaltyActivationRequired = Boolean(
+    /\b(?:xtra|kaufland\s*card)\b/i.test(text)
+      && /(?:coupon|gutschein).{0,50}aktivier|aktivier.{0,50}(?:coupon|gutschein)|aktivier.{0,50}\b(?:xtra|punkte|münzen)\b/i.test(text)
+  );
+  return {
+    loyaltyPrice,
+    loyaltyPriceText,
+    loyaltyProgram: loyaltyPrice != null && /\bxtra\b/i.test(text) ? 'Kaufland Card XTRA' : null,
+    loyaltyActivationRequired,
+    loyaltyPointsRequired: points ? Number(points[1]) : null,
+    minimumPurchaseAmount: minimum ? parseGermanNumber(minimum[1]) : null,
+    purchaseLimitText: limit ? normalizeText(limit[0]) : null,
+    discountPercent: percent ? Number(percent[1]) : null
+  };
+}
+
 function parseOfferCountDetails(value) {
   const normalized = normalizeText(value);
   const carouselMatch = normalized.match(/(?:angebote|offer(?:s)?)\s*(?:\(\s*)?[\d.]+\s*\/\s*([\d.]+)/i);
@@ -358,10 +409,30 @@ export function parseOfferCount(value) {
   return parseOfferCountDetails(value).count;
 }
 
+export function marketCollectionStatus({ loadedCardCount = 0, locationStatus = 'unknown', targetReached = false, scrollExhausted = false, expectedCountKind = null } = {}) {
+  if (!loadedCardCount || locationStatus === 'mismatch') return 'failed';
+  const scrollCanConfirmCoverage = expectedCountKind !== 'cards';
+  return targetReached || (scrollCanConfirmCoverage && scrollExhausted) ? 'complete' : 'incomplete';
+}
+
+export function assignOcrLinesToRegions(lines = [], regions = []) {
+  const grouped = regions.map((region) => ({ ...region, ocrLines: [] }));
+  for (const line of lines) {
+    if (!line.box) continue;
+    const x = line.box.x + line.box.width / 2;
+    const y = line.box.y + line.box.height / 2;
+    const containing = grouped
+      .filter((region) => x >= region.x - 8 && x <= region.x + region.width + 8 && y >= region.y - 8 && y <= region.y + region.height + 8)
+      .sort((left, right) => left.width * left.height - right.width * right.height);
+    containing[0]?.ocrLines.push(line.text);
+  }
+  return grouped.map((region) => ({ ...region, text: normalizeText(region.ocrLines.join('\n')) }));
+}
+
 export function parseDate(value, referenceDate = new Date()) {
   const match = normalizeText(value).match(DATE_RE);
   if (!match) return null;
-  const [day, month, rawYear] = match[1].split('.').map(Number);
+  const [day, month, rawYear] = match[1].replace(/\.$/, '').split('.').map(Number);
   const reference = new Date(referenceDate);
   const year = rawYear == null ? reference.getUTCFullYear() : rawYear < 100 ? 2000 + rawYear : rawYear;
   const date = new Date(Date.UTC(year, month - 1, day));
@@ -437,6 +508,35 @@ export function parsePackSize(value) {
     };
   }
 
+  // Einige KaufDA-Karten nennen die Multipack-Menge in der Preiszeile
+  // (z. B. „12 Packungen für insgesamt 9,99 €“) und die Einzelpackung separat
+  // (z. B. „1-l-Packung“). Die Zahl der Einheiten ist dann keine Größe.
+  const packCountMatch = normalized.match(/\b(\d+)\s*(?:packungen?|flaschen?|becher|dosen|gläser)\b/i);
+  if (packCountMatch) {
+    const item = normalized.match(/(\d+(?:[,.]\d+)?)\s*[- ]?\s*(kg|g|l|ml|cl|stück|stk\.?)\s*(?:-?\s*(?:packung|flasche|becher|dose|glas))?/i);
+    if (item) {
+      const count = Number(packCountMatch[1]);
+      const itemValue = parseGermanNumber(item[1]);
+      const itemUnit = item[2].replace('.', '').toLocaleLowerCase('de-DE');
+      if (Number.isInteger(count) && count > 0 && itemValue != null) {
+        return {
+          text: `${count} × ${item[1]} ${itemUnit}`,
+          value: Math.round(itemValue * count * 100) / 100,
+          unit: itemUnit,
+          count,
+          itemValue,
+          itemUnit,
+          ambiguous: false,
+          variants: []
+        };
+      }
+    }
+    return {
+      text: packCountMatch[0], value: null, unit: null, count: Number(packCountMatch[1]),
+      itemValue: null, itemUnit: null, ambiguous: true, variants: []
+    };
+  }
+
   const text = normalized.match(PACK_RE)?.[0] ?? null;
   if (!text) return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
   const match = text.match(/(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)/i);
@@ -456,8 +556,14 @@ export function parsePackSize(value) {
 
 export function parseUnitPrice(value) {
   const text = normalizeText(value);
+  const perHundred = text.match(/(?:je|pro)\s+100\s*(g|ml)\s*(?:=|:)??\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/i);
+  if (perHundred) return { amount: parseGermanNumber(perHundred[2]), unit: `100 ${perHundred[1].toLocaleLowerCase('de-DE')}`, text };
   const match = text.match(UNIT_PRICE_RE);
-  if (match) return { amount: parseGermanNumber(match[2]), unit: match[1].replace('.', '').toLocaleLowerCase('de-DE'), text };
+  if (match) {
+    const unit = (match[1] ?? match[4]).replace('.', '').replace(/\s+/g, ' ').toLocaleLowerCase('de-DE');
+    const amount = parseGermanNumber(match[2] ?? match[3]);
+    return { amount, unit: unit === 'liter' ? 'l' : unit, text };
+  }
   const labelled = text.match(/\b(kg|g|l|ml|cl|stück|stk\.?)\s*[- ]?preis\s*:?\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)/i);
   if (!labelled) return { amount: null, unit: null, text: text || null };
   return { amount: parseGermanNumber(labelled[2]), unit: labelled[1].replace('.', '').toLocaleLowerCase('de-DE'), text };
@@ -551,15 +657,59 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const text = normalizeText(raw.text ?? [raw.name, raw.productDescription, raw.priceText, raw.packSizeText, raw.unitPriceText, raw.validityText].filter(Boolean).join('\n'));
   const lines = String(raw.text ?? text).split(/\r?\n/).map(normalizeText).filter(Boolean);
   const imageOcrRequired = config.imageOcr?.enabled === true && config.imageOcr?.required === true;
-  const imageOcrBlocksPlanning = imageOcrRequired && config.imageOcr?.blockPlanning === true;
+  const imageOcrBlocksPlanning = (imageOcrRequired && config.imageOcr?.blockPlanning === true)
+    || (market.collectionMode === 'prospect' && imageOcrRequired);
   const imageProductStatus = raw.imageProductStatus ?? (imageOcrRequired ? 'missing' : 'not-required');
-  const name = chooseName(lines, raw.imageProductStatus === 'verified' ? raw.imageProductName || raw.name : raw.name);
-  const priceDetails = raw.priceDetails ?? parsePriceDetails(raw.priceText || text);
+  const visibleName = chooseName(lines, raw.name);
+  const name = visibleName ?? (raw.imageProductStatus === 'verified' ? chooseName([], raw.imageProductName ?? '') : null);
   const reportedPrice = raw.price == null ? null : Number(raw.price);
-  const price = Number.isFinite(priceDetails.currentPrice) ? priceDetails.currentPrice : reportedPrice;
   const productDescription = normalizeText(raw.productDescription || findProductDescriptionText(raw.text ?? text)) || null;
-  const pack = parsePackSize(raw.packSizeText || productDescription || findPackSizeText(raw.text ?? text));
-  const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, /pro Einheit|kg\s*=|l\s*=|kg[- ]?Preis|l[- ]?Preis|\/kg|\/l/i)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+  const packEvidenceText = [
+    raw.packSizeText,
+    productDescription,
+    ...lines.filter((line) => PACK_RE.test(line) && !UNIT_PRICE_LINE_RE.test(line))
+  ].filter(Boolean).join('\n');
+  const pack = parsePackSize(packEvidenceText || findPackSizeText(raw.text ?? text));
+  const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+  const kaufland = isKauflandMarket(market);
+  const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
+    loyaltyPrice: null,
+    loyaltyPriceText: null,
+    loyaltyProgram: null,
+    loyaltyActivationRequired: false,
+    loyaltyPointsRequired: null,
+    minimumPurchaseAmount: null,
+    purchaseLimitText: null,
+    discountPercent: null
+  };
+  const priceTextForParsing = kaufland && kauflandConditions.loyaltyPriceText
+    ? text.replace(kauflandConditions.loyaltyPriceText, ' ')
+    : raw.priceText || lines.join('\n');
+  const priceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  const explicitActivation = raw.activationRequired ?? (/(?:gutschein|coupon|rabatt)/i.test(text) && /(?:aktivieren|aktivierung erforderlich)/i.test(text));
+  // Ein sichtbarer Standardpreis bleibt verwendbar, wenn nur der zusätzliche
+  // XTRA-Preis erst nach Coupon-/Punkteeinlösung gilt.
+  const activationRequired = Boolean(explicitActivation && !(kauflandConditions.loyaltyPrice != null && Number.isFinite(priceDetails.currentPrice)));
+  const counterPrice = /(?:bedienungs[- ]?theke|frischetheke|an der theke|thekenware)/i.test(text);
+  const explicitWeightBasis = /(?:je|pro|\/|€\s*\/\s*)\s*100\s*g\b/i.test(`${text} ${unit.text ?? ''}`)
+    || unit.unit === '100 g';
+  const weightUnitUnknown = counterPrice && !explicitWeightBasis && !Number.isFinite(unit.amount);
+  const price = Number.isFinite(priceDetails.currentPrice)
+    ? priceDetails.currentPrice
+    : Number.isFinite(reportedPrice)
+      ? reportedPrice
+      : explicitWeightBasis && unit.unit === '100 g'
+        ? unit.amount
+        : null;
+  const priceBasis = activationRequired
+    ? 'conditional-coupon'
+    : pack.count > 1
+      ? 'multipack-total'
+      : explicitWeightBasis
+        ? 'price-per-100g'
+        : weightUnitUnknown
+          ? 'weight-based-unit-unknown'
+          : 'offer-pack';
   const validity = raw.validity ?? parseValidity(raw.validityText || text, fetchedAt);
   const validFrom = raw.validFrom ?? validity.validFrom ?? null;
   const validUntil = raw.validUntil ?? raw.validTo ?? validity.validUntil ?? null;
@@ -570,17 +720,65 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name ? (imageOcrRequired && imageProductStatus !== 'verified' ? 'image-unverified' : 'visible') : 'missing',
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
-    price: Number.isFinite(price) ? 'visible' : 'missing',
+    price: activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
     packSize: pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
     source: validUrl(sourceUrl) ? 'visible' : 'missing'
+  };
+  const evidence = {
+    visibleText: normalizeText(raw.text ?? text).slice(0, 1200) || null,
+    price: {
+      visibleText: normalizeText(raw.priceText ?? '').slice(0, 400) || null,
+      currentPrice: Number.isFinite(price) ? price : null,
+      previousPrice: priceDetails.previousPrice,
+      discountPercent: kauflandConditions.discountPercent,
+      loyaltyPrice: kauflandConditions.loyaltyPrice,
+      loyaltyProgram: kauflandConditions.loyaltyProgram,
+      loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
+      loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
+      minimumPurchaseAmount: kauflandConditions.minimumPurchaseAmount,
+      purchaseLimitText: kauflandConditions.purchaseLimitText,
+      unitPrice: Number.isFinite(unit.amount) ? unit.amount : null,
+      unitPriceUnit: unit.unit ?? null,
+      basis: priceBasis,
+      activationRequired: Boolean(activationRequired),
+      weightUnitUnknown
+    },
+    packaging: {
+      visibleText: normalizeText([raw.packSizeText, productDescription].filter(Boolean).join(' ')).slice(0, 400) || null,
+      pack: pack.text,
+      count: pack.count,
+      itemValue: pack.itemValue,
+      itemUnit: pack.itemUnit,
+      status: fieldStatus.packSize
+    },
+    imageProduct: {
+      status: imageProductStatus,
+      recognizedName: imageProductStatus === 'verified' ? raw.imageProductName ?? name : null,
+      confidence: Number.isFinite(Number(raw.imageOcrConfidence)) ? Number(raw.imageOcrConfidence) : null
+    },
+    market: {
+      key: market.key ?? null,
+      label: marketLabel(market),
+      visibleLocation: raw.visibleLocation ?? null,
+      locationStatus: raw.locationStatus ?? 'unknown'
+    },
+    validity: {
+      visibleText: normalizeText(raw.validityText ?? validity.text ?? '').slice(0, 300) || null,
+      status: validity.status,
+      validFrom,
+      validUntil
+    },
+    sourcePage: raw.sourcePage ?? null
   };
   const reasons = [];
   let state = 'unrecognized';
   if (!name) reasons.push('Produktname fehlt.');
   if (!Number.isFinite(price)) reasons.push('Angebotspreis fehlt oder ist ungültig.');
   if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
+  if (activationRequired) reasons.push('Rabatt erfordert eine Aktivierung; der Preis ist nicht ohne Weiteres verfügbar.');
+  if (weightUnitUnknown) reasons.push('Gewichtsabhängiger Thekenpreis ohne erkennbare Bezugsmenge.');
   if (recognized && !categoryScopeActive && classification.label === 'nonfood') {
     state = 'rejected';
     reasons.push(...classification.reasons);
@@ -603,6 +801,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
       previousPrice: priceDetails.previousPrice,
       discountAmount: priceDetails.discountAmount,
+      discountPercent: kauflandConditions.discountPercent,
       priceType: priceDetails.type,
       priceEvidence: priceDetails,
       packSize: pack.text,
@@ -624,6 +823,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
         sourceUrl,
         classification,
         fieldStatus,
+        evidence,
         state,
         reasons,
       }
@@ -635,7 +835,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
   const packBlocksPlanning = !categoryScopeActive && (!pack.text || pack.value == null || pack.ambiguous);
   const planningReady = Boolean(
-    name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl)
+    name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
   );
@@ -652,7 +852,16 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
     previousPrice: priceDetails.previousPrice,
     discountAmount: priceDetails.discountAmount,
+    discountPercent: kauflandConditions.discountPercent,
     priceType: priceDetails.type,
+    priceBasis,
+    activationRequired: Boolean(activationRequired),
+    loyaltyPrice: kauflandConditions.loyaltyPrice,
+    loyaltyProgram: kauflandConditions.loyaltyProgram,
+    loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
+    loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
+    minimumPurchaseAmount: kauflandConditions.minimumPurchaseAmount,
+    purchaseLimitText: kauflandConditions.purchaseLimitText,
     planningStatus: planningReady ? 'ready' : 'needs-review',
     currency: raw.currency ?? 'EUR',
     packSize: pack.text,
@@ -664,6 +873,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     unitPriceUnit: unit.unit,
     unitPriceText: unit.text,
     sourceUrl,
+    sourcePage: raw.sourcePage ?? null,
     source: 'kaufda-visible-public-page',
     sourceId: raw.cardId ?? raw.productId ?? raw.sourceId ?? null,
     capturedAt: fetchedAt,
@@ -673,6 +883,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     validTo: validUntil,
     classification,
     fieldStatus,
+    evidence,
     reviewStatus: complete ? 'ready' : 'needs-review',
     status: complete ? 'verified' : 'needs-review',
   };
@@ -710,7 +921,7 @@ async function readKaufdaSnapshot(page) {
     const bodyLines = bodyText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
     const locationText = bodyLines.find((line) => /\bkm\b/i.test(line) && /,/.test(line)) || null;
     const visiblePackRe = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
-    const visibleUnitPriceLineRe = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
+    const visibleUnitPriceLineRe = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|€\s*\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|je\s+(?:100\s*(?:g|ml)|kg|g|l|ml|cl|liter|stück))/i;
     const findProductDescription = (lines) => {
       const start = lines.findIndex((line) => visiblePackRe.test(line) && !visibleUnitPriceLineRe.test(line));
       if (start < 0) return '';
@@ -739,7 +950,8 @@ async function readKaufdaSnapshot(page) {
       const text = (element.innerText ?? '').trim();
       const productImages = [...element.querySelectorAll('img')].filter((item) => {
         const alt = (item.alt || item.title || '').trim();
-        return alt.length >= 2 && !/(logo|einkaufsliste|hinzufügen|placeholder|fallback)/i.test(alt);
+        const source = item.currentSrc || item.src || '';
+        return Boolean(source) && !/(logo|einkaufsliste|hinzufügen|placeholder|fallback)/i.test(`${alt} ${source}`);
       });
       const image = productImages[0];
       if (!image || !/€/.test(text) || text.length < 8 || text.length > 1600) return;
@@ -749,9 +961,11 @@ async function readKaufdaSnapshot(page) {
       candidates.push({ element, text, image });
     };
     for (const selector of selectors) for (const element of document.querySelectorAll(selector)) add(element);
-    if (candidates.length < 3) {
-      for (const element of document.querySelectorAll('div')) add(element);
-    }
+    // Kaufland/KaufDA können innerhalb eines gemischten Rasters sowohl
+    // semantische Karten als auch generische div-Karten ausliefern. Ein
+    // erfolgreicher Treffer mit nur wenigen Kacheln darf den Fallback nicht
+    // für alle übrigen div-Karten abschalten.
+    for (const element of document.querySelectorAll('div')) add(element);
 
     const cards = [];
     const seen = new Set();
@@ -952,6 +1166,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   let expectedCountKind = expectedCountKindHint;
   let pass = 0;
   let stableAtEnd = 0;
+  let scrollExhausted = false;
   let previousCardCount = -1;
   const rawCards = new Map();
   let lastSnapshot = { bodyText: '', cards: [] };
@@ -966,7 +1181,14 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
       if (expectedCount == null && measurement.count != null) expectedCount = measurement.count;
       if (!expectedCountKind && measurement.kind) expectedCountKind = measurement.kind;
     }
-    for (const card of snapshot.cards) rawCards.set(rawCardKey(card), card);
+    for (const card of snapshot.cards) {
+      rawCards.set(rawCardKey(card), {
+        ...card,
+        sourcePage: card.sourcePage ?? snapshot.pageUrl ?? null,
+        visibleLocation: card.visibleLocation ?? snapshot.locationText ?? null,
+        locationStatus: card.locationStatus ?? matchVisibleLocation(snapshot.locationText, market.location ?? config.location)
+      });
+    }
   };
 
   while (pass < scroll.maxPasses) {
@@ -984,7 +1206,10 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
     if (loadedCardCount <= previousCardCount && progress.after >= progress.max - 4) stableAtEnd += 1;
     else stableAtEnd = 0;
     previousCardCount = loadedCardCount;
-    if (stableAtEnd >= scroll.stablePassesAtEnd) break;
+    if (stableAtEnd >= scroll.stablePassesAtEnd) {
+      scrollExhausted = true;
+      break;
+    }
     pass += 1;
   }
 
@@ -1019,8 +1244,9 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   if (config.imageOcr?.enabled === true && imageScan.attempted && imageScan.verified < imageScan.attempted) warnings.push(`${imageScan.attempted - imageScan.verified} Angebotsbilder konnten den Produktnamen nicht sicher bestätigen.`);
   if (detailScan.failed) warnings.push(`${detailScan.failed} Detailansichten konnten nicht gelesen werden; betroffene Felder bleiben prüfpflichtig.`);
   if (expectedCount == null) warnings.push('KaufDA-Zielzahl der Angebote war nicht sichtbar; Vollständigkeit ist nicht messbar.');
-  if (expectedCountKind === 'prospect-pages') warnings.push(`KaufDA zeigt ${expectedCount} Prospektseiten; Seitenzahl und Kartenanzahl sind nicht vergleichbar.`);
+  if (expectedCountKind === 'prospect-pages') warnings.push(`KaufDA zeigt ${expectedCount} Prospektseiten. Diese Zahl ist keine Sollzahl für Angebotskacheln. ${scrollExhausted ? 'Die Kachelliste wurde bis zum stabilen Scroll-Ende erfasst.' : 'Die Kachelliste wurde nicht nachweislich bis zum Ende erfasst.'} Fehlende Produkte sind kein negatives Angebotsergebnis.`);
   else if (expectedCount != null && !targetReached) warnings.push(`Zielzahl nicht erreicht: ${loadedCardCount}/${expectedCount} Karten.`);
+  if (!targetReached && !scrollExhausted) warnings.push('Die Kachelliste erreichte kein stabiles Scroll-Ende; die Erfassung ist unvollständig.');
   if (uncertainCount && categoryScopeActive) warnings.push(`${uncertainCount} Karten haben eine unsichere Wortlistenklassifikation; die ausgewählte KaufDA-Kategorie bleibt für den Angebotsumfang maßgeblich.`);
   else if (uncertainCount) warnings.push(`${uncertainCount} erkannte Karten bleiben wegen unsicherer Lebensmittelklassifikation in der Prüfung.`);
   if (locationStatus === 'unknown') warnings.push('Sichtbarer Marktstandort fehlt oder konnte nicht sicher gelesen werden; Angebote bleiben prüfpflichtig.');
@@ -1052,10 +1278,166 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
     unrecognizedCount,
     passes: pass + 1,
     targetReached,
-    completenessStatus: !lastSnapshot.cards.length || locationStatus === 'mismatch' ? 'failed' : targetReached ? 'complete' : 'incomplete',
+    scrollExhausted,
+    completenessStatus: marketCollectionStatus({ loadedCardCount, locationStatus, targetReached, scrollExhausted, expectedCountKind }),
     errors: !lastSnapshot.cards.length
       ? ['Keine sichtbaren Angebotskarten erkannt; KaufDA-Struktur oder Einstiegsseite möglicherweise geändert.', ...errors]
       : errors,
+    warnings
+  };
+}
+
+export async function collectProspectOffersFromPage(page, market, configInput = {}) {
+  const config = mergeConfig(configInput);
+  const waitMs = Math.max(0, Number(market.prospectPageWaitMs ?? 900));
+  const initialText = await page.locator('body').innerText().catch(() => '');
+  const viewerCounter = await page.evaluate(() => [...document.querySelectorAll('button')]
+    .map((button) => button.innerText || button.getAttribute('aria-label') || '')
+    .find((value) => /^\s*\d{1,3}(?:\s*[-–]\s*\d{1,3})?\s*\/\s*\d{1,3}\s*$/.test(value)) ?? '');
+  const countMatch = viewerCounter.match(/\b\d{1,3}\s*\/\s*(\d{1,3})\b/)
+    ?? initialText.match(/\b(?:seite|page)\s+\d+\s+(?:von|of)\s+(\d{1,3})\b/i);
+  const expectedPageCount = Number(countMatch?.[1]);
+  const visibleLocation = (await page.evaluate(() => document.body?.innerText ?? '')).split(/\n+/)
+    .map((line) => line.trim()).find((line) => /\bkm\b/i.test(line) && /,/.test(line)) ?? null;
+  const locationStatus = matchVisibleLocation(visibleLocation, market.location ?? config.location);
+  const warnings = [];
+  const errors = [];
+  if (!Number.isInteger(expectedPageCount) || expectedPageCount < 1) {
+    return {
+      offers: [], reviewItems: [], expectedPageCount: null, expectedCountKind: 'prospect-pages',
+      loadedCardCount: 0, recognizedOfferCount: 0, unrecognizedCount: 0, pageTraversalStatus: 'failed',
+      visibleLocation, locationStatus, targetReached: false, scrollExhausted: false,
+      completenessStatus: 'failed', warnings, errors: ['Prospekt-Seitenzahl ist im sichtbaren Viewer nicht erkennbar.']
+    };
+  }
+  if (locationStatus === 'mismatch') errors.push('Der sichtbare KaufDA-Standort passt nicht zum konfigurierten Kaufland-Markt.');
+  const { createImageTextReader, matchImageProductName } = await import('./image-ocr.mjs');
+  const reader = await createImageTextReader({ language: config.imageOcr?.language ?? 'deu+eng' });
+  const collected = [];
+  let visitedPageCount = 0;
+  let failedPageCount = 0;
+  let pageWithNoProductLinks = 0;
+  try {
+    const firstUrl = new URL(page.url());
+    for (let pageNumber = 1; pageNumber <= expectedPageCount; pageNumber += 2) {
+      const pageUrl = new URL(firstUrl);
+      pageUrl.searchParams.set('page', String(pageNumber));
+      try {
+        await page.goto(pageUrl.href, { waitUntil: 'domcontentloaded', timeout: market.navigationTimeoutMs ?? 30000 });
+        await page.waitForTimeout(waitMs);
+        const regions = await page.evaluate(() => [...document.querySelectorAll('a[id^="overlay-"], a[aria-description*="Link"]')]
+          .map((anchor) => {
+            const rect = anchor.getBoundingClientRect();
+            const image = anchor.querySelector('img');
+            const label = anchor.getAttribute('aria-label')
+              || anchor.getAttribute('aria-description')
+              || anchor.getAttribute('title')
+              || anchor.innerText
+              || image?.alt
+              || image?.title
+              || '';
+            return {
+              id: anchor.id || anchor.href,
+              name: String(label).replace(/\s+/g, ' ').trim(),
+              href: anchor.href,
+              x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+              visible: rect.width > 12 && rect.height > 12 && rect.bottom > 0 && rect.right > 0
+                && rect.top < innerHeight && rect.left < innerWidth && rect.right < innerWidth * 0.82
+            };
+          })
+          .filter((region) => region.visible && region.name.length >= 2 && region.width * region.height > 1200));
+        const screenshot = await page.screenshot({ type: 'png' });
+        const ocrLines = await reader.recognize(screenshot);
+        const grouped = assignOcrLinesToRegions(ocrLines, regions);
+        const medianX = grouped.length ? [...grouped].map((region) => region.x + region.width / 2).sort((a, b) => a - b)[Math.floor(grouped.length / 2)] : (page.viewportSize()?.width ?? 870) / 2;
+        const headerBySide = ['left', 'right'].map((side) => {
+          const sideRegions = grouped.filter((region) => (region.x + region.width / 2 < medianX) === (side === 'left'));
+          const topY = sideRegions.length ? Math.min(...sideRegions.map((region) => region.y)) : 280;
+          const headerLines = ocrLines.filter((line) => {
+            const centerX = line.box.x + line.box.width / 2;
+            const centerY = line.box.y + line.box.height / 2;
+            return (centerX < medianX) === (side === 'left') && centerY < Math.max(260, topY + 28);
+          }).map((line) => line.text);
+          return normalizeText(headerLines.join(' '));
+        });
+        let pageLinkCount = 0;
+        for (const region of grouped) {
+          pageLinkCount += 1;
+          const side = region.x + region.width / 2 < medianX ? 0 : 1;
+          const pageValidityText = headerBySide[side];
+          const validityText = /\d{1,2}\.\d{1,2}/.test(region.text) ? region.text : pageValidityText;
+          const imageMatch = matchImageProductName({
+            cardName: region.name,
+            ocrText: region.text,
+            minConfidence: config.imageOcr?.minConfidence
+          });
+          const sourcePageNumber = Math.min(expectedPageCount, pageNumber + side);
+          const sourcePage = new URL(pageUrl);
+          sourcePage.searchParams.set('page', String(sourcePageNumber));
+          const raw = {
+            cardId: `${region.id}:page-${sourcePageNumber}`,
+            name: region.name,
+            text: [region.name, region.text, validityText].filter(Boolean).join('\n'),
+            priceText: region.text,
+            validityText,
+            sourceUrl: region.href && isKaufdaSourceUrl(region.href) ? region.href : pageUrl.href,
+            sourcePage: sourcePage.href,
+            imageProductName: imageMatch.imageProductName,
+            imageProductStatus: imageMatch.status,
+            imageOcrConfidence: imageMatch.confidence,
+            visibleLocation,
+            locationStatus
+          };
+          const assessment = assessOffer(raw, market, { ...config, categoryScopeActive: false }, new Date().toISOString());
+          if (assessment.offer && locationStatus !== 'mismatch') {
+            collected.push(locationStatus === 'matched' ? { ...assessment.offer, marketLocationStatus: 'matched' } : {
+              ...assessment.offer, marketLocationStatus: 'unknown', planningStatus: 'needs-review', status: 'needs-review', reviewStatus: 'needs-review'
+            });
+          } else if (assessment.reviewItem) {
+            collected.push({ reviewItem: assessment.reviewItem });
+          }
+        }
+        if (!pageLinkCount) pageWithNoProductLinks += 1;
+        visitedPageCount += 2;
+      } catch (error) {
+        failedPageCount += 2;
+        warnings.push(`Prospektseite ${pageNumber}–${Math.min(expectedPageCount, pageNumber + 1)} konnte nicht sicher ausgewertet werden: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } finally {
+    await reader.close();
+  }
+  const offers = dedupeOffers(collected.filter((item) => item.id).map((item) => item));
+  const reviewItems = collected.filter((item) => item.reviewItem).map((item) => item.reviewItem).slice(0, config.maxReviewItems);
+  const recognizedOfferCount = offers.length;
+  const unrecognizedCount = reviewItems.length + pageWithNoProductLinks;
+  if (pageWithNoProductLinks) warnings.push(`${pageWithNoProductLinks} Prospekt-Doppelseiten enthielten keine sicher zuordenbaren Produktlinks.`);
+  warnings.push('Der Prospekt wurde seitenweise besucht. Die Angebotsvollständigkeit ist nicht aus einer Kachel-Zielzahl ableitbar; fehlende Artikel bleiben unbekannt.');
+  const pageTraversalStatus = failedPageCount === 0 && visitedPageCount >= expectedPageCount ? 'complete' : 'incomplete';
+  return {
+    offers,
+    reviewItems,
+    expectedPageCount,
+    expectedCountKind: 'prospect-pages',
+    loadedCardCount: collected.length,
+    recognizedOfferCount,
+    foodOfferCount: offers.length,
+    uncertainCount: reviewItems.filter((item) => item.classification?.label === 'uncertain').length,
+    rejectedCount: reviewItems.filter((item) => item.classification?.label === 'nonfood').length,
+    unrecognizedCount,
+    imageOcrAttempted: visitedPageCount / 2,
+    imageOcrVerified: offers.filter((offer) => offer.fieldStatus?.imageProduct === 'verified').length,
+    imageOcrFailed: failedPageCount / 2,
+    passes: visitedPageCount / 2,
+    targetReached: false,
+    scrollExhausted: pageTraversalStatus === 'complete',
+    pageTraversalStatus,
+    visibleLocation,
+    locationStatus,
+    categoryScoped: false,
+    categoryOfferCount: offers.length,
+    completenessStatus: locationStatus === 'mismatch' ? 'failed' : 'incomplete',
+    errors,
     warnings
   };
 }
@@ -1068,6 +1450,7 @@ function buildMarketResult(market, config, startedAt) {
     location: market.location ?? config.location,
     sourceUrl: market.url ?? null,
     offerCategory: market.offerCategory ?? config.offerCategory ?? null,
+    collectionMode: market.collectionMode ?? 'tiles',
     offerCategoryStatus: 'not-attempted',
     categoryScoped: false,
     categoryOfferCount: 0,
@@ -1088,6 +1471,7 @@ function buildMarketResult(market, config, startedAt) {
     unrecognizedCount: 0,
     passes: 0,
     targetReached: false,
+    scrollExhausted: false,
     pageUrl: null,
     visibleLocation: null,
     expectedLocation: market.location ?? config.location,
@@ -1159,6 +1543,15 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
           await page.waitForTimeout(market.afterOffersTabWaitMs ?? 2500);
           return true;
         };
+        const activateProspectTab = async () => {
+          const tab = page.getByRole('tab', { name: /^Prospekt$/i }).first();
+          const fallback = page.getByRole('button', { name: /^Prospekt(?:\s|$)/i }).first();
+          const selected = (await tab.count()) ? tab : fallback;
+          if (!await selected.count()) return false;
+          await selected.click();
+          await page.waitForTimeout(market.afterProspectTabWaitMs ?? 2000);
+          return true;
+        };
         if (/\/search(?:[/?]|$)/i.test(page.url())) {
           const marketResults = page.getByRole('listitem').filter({ hasText: market.store ?? market.label ?? market.key });
           const marketResultCount = await marketResults.count();
@@ -1178,20 +1571,30 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         }
         const selectedPageFailure = kaufdaPageFailure(page.url());
         if (selectedPageFailure) throw new Error(selectedPageFailure);
-        await activateOffersTab();
-        const categoryScan = await activateOfferCategory(page, market, config);
-        const pageConfig = {
-          ...config,
-          categoryScopeActive: categoryScan.status === 'selected'
-        };
-        const scan = await collectOffersFromPage(page, market, pageConfig, expectedCountHint, expectedCountKindHint);
-        scan.offerCategory = categoryScan.label;
-        scan.offerCategoryStatus = categoryScan.status;
-        scan.categoryScoped = pageConfig.categoryScopeActive;
-        if (categoryScan.status === 'unavailable') {
-          scan.warnings.push(`KaufDA-Kategorie „${categoryScan.label}“ war in dieser Ansicht nicht verfügbar; die Lebensmittelklassifikation bleibt als Sicherheitsfilter aktiv.`);
-        } else if (categoryScan.status === 'failed') {
-          scan.warnings.push(`KaufDA-Kategorie „${categoryScan.label}“ konnte nicht ausgewählt werden: ${categoryScan.error}`);
+        let scan;
+        if (market.collectionMode === 'prospect') {
+          if (!await activateProspectTab()) throw new Error('Kaufland-Prospektansicht war im ausgewählten Markt nicht sichtbar.');
+          scan = await collectProspectOffersFromPage(page, market, config);
+          scan.offerCategory = null;
+          scan.offerCategoryStatus = 'not-attempted';
+          scan.collectionMode = 'prospect';
+        } else {
+          await activateOffersTab();
+          const categoryScan = await activateOfferCategory(page, market, config);
+          const pageConfig = {
+            ...config,
+            categoryScopeActive: categoryScan.status === 'selected'
+          };
+          scan = await collectOffersFromPage(page, market, pageConfig, expectedCountHint, expectedCountKindHint);
+          scan.offerCategory = categoryScan.label;
+          scan.offerCategoryStatus = categoryScan.status;
+          scan.categoryScoped = pageConfig.categoryScopeActive;
+          scan.collectionMode = 'tiles';
+          if (categoryScan.status === 'unavailable') {
+            scan.warnings.push(`KaufDA-Kategorie „${categoryScan.label}“ war in dieser Ansicht nicht verfügbar; die Lebensmittelklassifikation bleibt als Sicherheitsfilter aktiv.`);
+          } else if (categoryScan.status === 'failed') {
+            scan.warnings.push(`KaufDA-Kategorie „${categoryScan.label}“ konnte nicht ausgewählt werden: ${categoryScan.error}`);
+          }
         }
         Object.assign(result, scan);
         result.finishedAt = new Date().toISOString();
@@ -1244,7 +1647,11 @@ export function buildOffersDocument({ config: configInput, results = [], offers 
     completenessStatus: errorCount === marketCount || !marketCount ? 'failed' : incompleteMarketCount ? 'incomplete' : 'complete',
     planningReadyOfferCount: normalizedOffers.filter((offer) => offer.planningStatus === 'ready').length,
     planningReviewOfferCount: normalizedOffers.filter((offer) => offer.planningStatus !== 'ready').length,
-    planningCompletenessStatus: normalizedOffers.length && normalizedOffers.every((offer) => offer.planningStatus === 'ready') ? 'complete' : normalizedOffers.length ? 'partial' : 'empty'
+    planningCompletenessStatus: incompleteMarketCount > 0
+      ? 'partial'
+      : normalizedOffers.length
+        ? normalizedOffers.every((offer) => offer.planningStatus === 'ready') ? 'complete' : 'partial'
+        : 'empty'
   };
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -1271,6 +1678,11 @@ export function validateConfig(configInput) {
     else if (!/^https:\/\/(?:www\.)?kaufda\.de\//i.test(market.url)) errors.push(`markets[${index}].url muss auf eine öffentliche KaufDA-Seite zeigen`);
     if (market.key && seenKeys.has(market.key)) errors.push(`markets[${index}].key ist doppelt: ${market.key}`);
     if (market.key) seenKeys.add(market.key);
+    const collectionMode = market.collectionMode ?? 'tiles';
+    const isKaufland = /kaufland/i.test(`${market.key ?? ''} ${market.store ?? ''} ${market.label ?? ''}`);
+    if (!['tiles', 'prospect'].includes(collectionMode)) errors.push(`markets[${index}].collectionMode muss tiles oder prospect sein`);
+    if (collectionMode === 'prospect' && !isKaufland) errors.push(`markets[${index}].collectionMode=prospect ist derzeit nur für Kaufland freigegeben`);
+    if (market.interpretationProfile && (!isKaufland || market.interpretationProfile !== 'kaufland-v1')) errors.push(`markets[${index}].interpretationProfile ist nur mit kaufland-v1 auf Kaufland zulässig`);
   });
   if (!Number.isInteger(config.scroll.maxPasses) || config.scroll.maxPasses < 1) errors.push('scroll.maxPasses muss positiv sein');
   if (!Number.isInteger(config.scroll.stablePassesAtEnd) || config.scroll.stablePassesAtEnd < 1) errors.push('scroll.stablePassesAtEnd muss positiv sein');
@@ -1295,7 +1707,9 @@ export function validateOutputDocument(document) {
   if (!Number.isInteger(summary.planningReadyOfferCount) || summary.planningReadyOfferCount !== readyCount) errors.push('summary.planningReadyOfferCount stimmt nicht mit offers überein.');
   if (!Number.isInteger(summary.planningReviewOfferCount) || summary.planningReviewOfferCount !== reviewCount) errors.push('summary.planningReviewOfferCount stimmt nicht mit offers überein.');
   if (!['complete', 'incomplete', 'failed'].includes(summary.completenessStatus)) errors.push('summary.completenessStatus ist ungültig.');
-  const expectedPlanningStatus = !offers.length ? 'empty' : readyCount === offers.length ? 'complete' : 'partial';
+  const expectedPlanningStatus = summary.completenessStatus !== 'complete'
+    ? markets.length ? 'partial' : 'empty'
+    : !offers.length ? 'empty' : readyCount === offers.length ? 'complete' : 'partial';
   if (summary.planningCompletenessStatus !== expectedPlanningStatus) errors.push('summary.planningCompletenessStatus stimmt nicht mit offers überein.');
   if (summary.completenessStatus === 'failed') errors.push('Alle Märkte sind fehlgeschlagen.');
   markets.forEach((market, index) => {
@@ -1314,6 +1728,9 @@ export function validateOutputDocument(document) {
     if (!Number.isFinite(offer.price) || offer.price < 0) errors.push(`${prefix}.price ist ungültig.`);
     if (!['verified', 'needs-review'].includes(offer.status)) errors.push(`${prefix}.status ist ungültig.`);
     if (!['ready', 'needs-review'].includes(offer.planningStatus)) errors.push(`${prefix}.planningStatus ist ungültig.`);
+    if (offer.activationRequired === true && offer.planningStatus === 'ready') errors.push(`${prefix} darf mit aktivierungspflichtigem Rabatt nicht planningStatus=ready tragen.`);
+    if (offer.priceBasis === 'multipack-total' && (!Number.isInteger(offer.packCount) || offer.packCount < 2)) errors.push(`${prefix} kennzeichnet einen Multipack-Gesamtpreis ohne bestätigte Multipack-Menge.`);
+    if (offer.priceBasis === 'weight-based-unit-unknown' && offer.planningStatus === 'ready') errors.push(`${prefix} darf ohne bestätigte Gewichtsbezugsmenge nicht planningStatus=ready tragen.`);
     const categoryScoped = offer.marketKey != null && marketByKey.get(offer.marketKey)?.categoryScoped === true;
     if (!categoryScoped && offer.classification?.label !== 'food') errors.push(`${prefix} ist nicht als food klassifiziert.`);
     if (!['matched', 'unknown'].includes(offer.marketLocationStatus)) errors.push(`${prefix}.marketLocationStatus ist nicht sicher.`);
@@ -1329,7 +1746,7 @@ export function validateOutputDocument(document) {
     if (offer.marketKey && marketByKey.get(offer.marketKey)?.locationStatus === 'mismatch') errors.push(`${prefix} verweist auf einen nicht passenden Marktstandort.`);
   });
   const warnings = [];
-  if (summary.completenessStatus === 'incomplete') warnings.push('Marktabdeckung ist unvollständig; planungsbereite Angebote bleiben trotzdem nutzbar.');
+  if (summary.completenessStatus === 'incomplete') warnings.push('Marktabdeckung ist unvollständig; planungsbereite Angebote sind nur die erkannten positiven Treffer. Fehlende Produkte sind kein negatives Angebotsergebnis.');
   if (summary.planningCompletenessStatus === 'partial') warnings.push('Ein Teil der Angebote benötigt noch eine Mengen-/Packungsprüfung.');
   if (offers.length && readyCount === 0) warnings.push('Kein Angebot ist aktuell für eine automatische Planung freigegeben.');
   return { valid: errors.length === 0, errors, warnings };

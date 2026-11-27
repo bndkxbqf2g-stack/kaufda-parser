@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   assessOffer,
+  assignOcrLinesToRegions,
   assertSafeOutputTarget,
   buildBrowserContextOptions,
   buildOffersDocument,
@@ -13,6 +14,7 @@ import {
   extractPriceText,
   isLikelyFood,
   kaufdaPageFailure,
+  marketCollectionStatus,
   mergeConfig,
   matchVisibleLocation,
   normalizeOffer,
@@ -54,6 +56,31 @@ test('Playwright-Lauf bleibt im einheitlichen KaufDA-Kartenlayout', () => {
   assert.equal(overridden.hasTouch, false);
 });
 
+test('Kaufland verwendet Prospektseiten; Netto bleibt im Kachelmodus', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const kaufland = config.markets.find((candidate) => candidate.key === 'Kaufland-Wuerzburg');
+  const netto = config.markets.find((candidate) => candidate.key === 'Netto-Thuengersheim');
+  assert.equal(kaufland.collectionMode, 'prospect');
+  assert.equal(kaufland.interpretationProfile, 'kaufland-v1');
+  assert.equal(netto.collectionMode ?? 'tiles', 'tiles');
+  assert.equal(validateConfig(config).valid, true);
+  const invalidNettoProfile = validateConfig({ ...config, markets: config.markets.map((candidate) => candidate.key === netto.key ? { ...candidate, collectionMode: 'prospect', interpretationProfile: 'kaufland-v1' } : candidate) });
+  assert.equal(invalidNettoProfile.valid, false);
+
+  const assigned = assignOcrLinesToRegions([
+    { text: 'MELITTA', box: { x: 20, y: 20, width: 30, height: 10 } },
+    { text: '4,99 €', box: { x: 105, y: 40, width: 25, height: 12 } }
+  ], [
+    { id: 'card-a', name: 'Coffee', x: 0, y: 0, width: 80, height: 80 },
+    { id: 'card-b', name: 'Melitta', x: 80, y: 0, width: 80, height: 80 }
+  ]);
+  assert.equal(assigned[0].text, 'MELITTA');
+  assert.equal(assigned[1].text, '4,99 €');
+  assert.deepEqual(parsePriceDetails('Gratis für mindestens 10 Euro Einkauf'), {
+    currentPrice: null, previousPrice: null, discountAmount: null, type: 'missing', text: 'Gratis'
+  });
+});
+
 test('KaufDA wählt den aktuellen NEU-Prospekt statt einer Online-Nebenbroschüre', () => {
   const online = 'Netto Marken-Discount\n1 Woche gültig';
   const current = 'Netto Marken-Discount\n6 Tage gültig\n• NEU';
@@ -83,6 +110,13 @@ test('Bild-OCR muss den Produktnamen global bestätigen', () => {
     confidence: 72
   });
   assert.equal(unverified.status, 'unverified');
+  const extractedFromImageWithoutAltText = matchImageProductName({
+    cardName: '',
+    ocrText: 'MUTTI\nPassierte Tomaten\n25 % Rabatt',
+    confidence: 72
+  });
+  assert.equal(extractedFromImageWithoutAltText.status, 'verified');
+  assert.equal(extractedFromImageWithoutAltText.imageProductName, 'Passierte Tomaten');
   assert.equal(originalImageUrl('https://content-media.bonial.biz/id/main.jpg?impolicy=preview'), 'https://content-media.bonial.biz/id/main.jpg');
   assert.equal(originalImageUrl('http://content-media.bonial.biz/id/main.jpg'), null);
   assert.equal(originalImageUrl('https://content-media.bonial.biz.attacker.test/id/main.jpg'), null);
@@ -183,6 +217,32 @@ test('KaufDA-Preiszeilen trennen Rabatt, Angebotspreis und Regelpreis', () => {
     text: '0,89 € * 1,29 €'
   });
   assert.equal(parsePrice('0,30 € sparen! 1,19 €'), 1.19);
+  assert.deepEqual(parsePriceDetails('1,99 € * 2,99 €'), {
+    currentPrice: 1.99,
+    previousPrice: 2.99,
+    discountAmount: null,
+    type: 'offer-with-previous',
+    text: '1,99 € * 2,99 €'
+  });
+  assert.deepEqual(parsePriceDetails('12 Packungen für insgesamt 9,99 €\n0,84 €/l'), {
+    currentPrice: 9.99,
+    previousPrice: null,
+    discountAmount: null,
+    type: 'offer-price',
+    text: '12 Packungen für insgesamt 9,99 €'
+  });
+  assert.deepEqual(parsePriceDetails('1,99 € statt 2,49 € · 0,84 €/l'), {
+    currentPrice: 1.99,
+    previousPrice: 2.49,
+    discountAmount: null,
+    type: 'offer-with-previous',
+    text: '1,99 € statt 2,49 € ·'
+  });
+  assert.deepEqual(parseUnitPrice('entspricht etwa 0,84 €/l'), {
+    amount: 0.84,
+    unit: 'l',
+    text: 'entspricht etwa 0,84 €/l'
+  });
 });
 
 test('Getrennte Preiszeilen ignorieren den Rabattbetrag als Angebotspreis', () => {
@@ -210,9 +270,20 @@ test('KaufDA-Kartenzahl wird auch mit Tausenderpunkt erkannt', () => {
   assert.equal(parseOfferCount('Angebote 1 / 37'), 37);
 });
 
+test('Prospektseitenzahl ist kein Kachelziel; Scroll-Ende bestimmt die Kachelabdeckung', () => {
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: false, scrollExhausted: true }), 'complete');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: false, scrollExhausted: false }), 'incomplete');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: false, scrollExhausted: true, expectedCountKind: 'cards' }), 'incomplete');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: true, scrollExhausted: false, expectedCountKind: 'cards' }), 'complete');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: false, scrollExhausted: true, expectedCountKind: 'prospect-pages' }), 'complete');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'mismatch', scrollExhausted: true }), 'failed');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 0, locationStatus: 'matched', scrollExhausted: true }), 'failed');
+});
+
 test('Packungsgröße, Grundpreis und Gültigkeit bleiben getrennt', () => {
   assert.deepEqual(parsePackSize('versch. Sorten 500-g-Packg.'), { text: '500-g-Packg', value: 500, unit: 'g', count: null, itemValue: 500, itemUnit: 'g', ambiguous: false, variants: [] });
   assert.deepEqual(parsePackSize('10 x 20 g = 200-g-Packung, Kühlung'), { text: '10 x 20 g', value: 200, unit: 'g', count: 10, itemValue: 20, itemUnit: 'g', ambiguous: false, variants: [] });
+  assert.deepEqual(parsePackSize('1-l-Packung\n12 Packungen für insgesamt 9,99 €'), { text: '12 × 1 l', value: 12, unit: 'l', count: 12, itemValue: 1, itemUnit: 'l', ambiguous: false, variants: [] });
   assert.deepEqual(parsePackSize('Wintertee; Versch. Sorten; je 40-, 45- bzw. 55-g-Packung 20 Beutel'), { text: '40-, 45- bzw. 55-g-Packung', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: [40, 45, 55] });
   assert.deepEqual(parseUnitPrice('Preis pro Einheit: 1 kg = 8,88 €'), { amount: 8.88, unit: 'kg', text: 'Preis pro Einheit: 1 kg = 8,88 €' });
   assert.deepEqual(parseUnitPrice('kg-Preis 19.80'), { amount: 19.8, unit: 'kg', text: 'kg-Preis 19.80' });
@@ -230,6 +301,181 @@ test('Packungsgröße, Grundpreis und Gültigkeit bleiben getrennt', () => {
   assert.equal(card.state, 'accepted');
   assert.equal(card.offer.packSize, null);
   assert.equal(card.offer.unitPrice, 19.98);
+});
+
+test('Kaufland-Screenshotbelege erhalten Preis, Multipack und getrennte Evidenz', () => {
+  const kaufland = {
+    key: 'Kaufland-Wuerzburg',
+    label: 'Kaufland Würzburg',
+    store: 'Kaufland',
+    url: 'https://www.kaufda.de/search?query=Kaufland'
+  };
+  const config = mergeConfig({
+    categoryScopeActive: true,
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: true, required: true, blockPlanning: false }
+  });
+  const examples = [
+    {
+      cardId: 'screenshot-grapes',
+      name: 'Ital./peruan. Tafeltrauben',
+      text: 'Ital./peruan. Tafeltrauben, hell, kernlos\n1,99 € statt 2,49 € (−20 %)\n500-g-Packung\nGültig 23.11.–28.11.2026',
+      priceText: '1,99 € statt 2,49 € (−20 %)',
+      packSizeText: '500-g-Packung',
+      validityText: 'Gültig 23.11.–28.11.2026',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/grapes?productId=grapes',
+      sourcePage: 'https://www.kaufda.de/contentViewer/static/brochure?page=12',
+      imageProductStatus: 'unverified'
+    },
+    {
+      cardId: 'screenshot-melitta',
+      name: 'MELITTA Kaffee',
+      text: 'MELITTA Kaffee, gemahlen, verschiedene Sorten\n4,99 € statt 8,49 € (−41 %)\n500-g-Packung\nGültig 23.11.–28.11.2026',
+      priceText: '4,99 € statt 8,49 € (−41 %)',
+      packSizeText: '500-g-Packung',
+      validityText: 'Gültig 23.11.–28.11.2026',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/melitta?productId=melitta',
+      sourcePage: 'https://www.kaufda.de/contentViewer/static/brochure?page=8',
+      imageProductStatus: 'unverified'
+    }
+  ];
+  const parsed = examples.map((raw) => assessOffer(raw, kaufland, config, '2026-11-26T15:33:32.128Z').offer);
+  assert.deepEqual(parsed.map((offer) => [offer.product, offer.price, offer.previousPrice, offer.packSizeValue, offer.packSizeUnit]), [
+    ['Ital./peruan. Tafeltrauben', 1.99, 2.49, 500, 'g'],
+    ['MELITTA Kaffee', 4.99, 8.49, 500, 'g']
+  ]);
+  assert.equal(parsed[0].evidence.imageProduct.status, 'unverified');
+  assert.equal(parsed[0].evidence.sourcePage, examples[0].sourcePage);
+
+  const milk = assessOffer({
+    cardId: 'screenshot-landliebe-multipack',
+    name: 'LANDLIEBE haltbare Landmilch',
+    text: 'LANDLIEBE haltbare Landmilch\n1,5 % oder 3,5 %\n1-l-Packung\n12 Packungen für insgesamt 9,99 €\nentspricht etwa 0,84 €/l\nGültig 23.11.–28.11.2026',
+    priceText: '12 Packungen für insgesamt 9,99 €',
+    packSizeText: '1-l-Packung',
+    unitPriceText: 'entspricht etwa 0,84 €/l',
+    validityText: 'Gültig 23.11.–28.11.2026',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/milk?productId=milk',
+    sourcePage: 'https://www.kaufda.de/contentViewer/static/brochure?page=4',
+    imageProductStatus: 'verified',
+    imageProductName: 'LANDLIEBE haltbare Landmilch',
+    imageOcrConfidence: 84
+  }, kaufland, config, '2026-11-26T15:33:32.128Z').offer;
+  assert.equal(milk.price, 9.99);
+  assert.equal(milk.priceBasis, 'multipack-total');
+  assert.equal(milk.packCount, 12);
+  assert.equal(milk.packSizeValue, 12);
+  assert.equal(milk.packSizeUnit, 'l');
+  assert.equal(milk.pack, '12 × 1 l');
+  assert.equal(milk.unitPrice, 0.84);
+  assert.equal(milk.unitPriceUnit, 'l');
+  assert.equal(milk.basePrice, null);
+  assert.equal(milk.evidence.imageProduct.status, 'verified');
+  assert.equal(milk.evidence.packaging.count, 12);
+  assert.equal(milk.evidence.validity.status, 'complete');
+  assert.equal(milk.evidence.market.key, 'Kaufland-Wuerzburg');
+  assert.equal(milk.evidence.sourcePage, 'https://www.kaufda.de/contentViewer/static/brochure?page=4');
+});
+
+test('Aktivierungspflicht und unklarer Thekenpreis bleiben prüfpflichtig', () => {
+  const config = mergeConfig({
+    categoryScopeActive: true,
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: true, required: true, blockPlanning: false }
+  });
+  const kaufland = { key: 'Kaufland-Wuerzburg', label: 'Kaufland Würzburg', store: 'Kaufland' };
+  const coupon = assessOffer({
+    name: 'Mutti passierte Tomaten',
+    text: 'Mutti passierte Tomaten\n25 % Rabatt\nGutschein in der Kaufland-App aktivieren',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/mutti',
+    imageProductStatus: 'unverified'
+  }, kaufland, config);
+  assert.equal(coupon.reviewItem.evidence.price.activationRequired, true);
+  assert.equal(coupon.reviewItem.evidence.price.basis, 'conditional-coupon');
+
+  const counter = assessOffer({
+    name: 'Schinken',
+    text: 'Schinken an der Theke\n0,99 €',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/schinken'
+  }, kaufland, mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' }));
+  assert.equal(counter.offer.price, 0.99);
+  assert.equal(counter.offer.priceBasis, 'weight-based-unit-unknown');
+  assert.equal(counter.offer.planningStatus, 'needs-review');
+  assert.match(counter.reasons.join(' '), /ohne erkennbare Bezugsmenge/);
+  assert.deepEqual(parseUnitPrice('je 100 g 0,99 €'), { amount: 0.99, unit: '100 g', text: 'je 100 g 0,99 €' });
+  assert.deepEqual(parseUnitPrice('0,99 €/100 g'), { amount: 0.99, unit: '100 g', text: '0,99 €/100 g' });
+
+  const explicitCounter = assessOffer({
+    name: 'Schinken',
+    text: 'Schinken an der Theke\n0,99 €/100 g',
+    priceText: '0,99 €/100 g',
+    unitPriceText: '0,99 €/100 g',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/schinken'
+  }, kaufland, mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' }));
+  assert.equal(explicitCounter.offer.price, 0.99);
+  assert.equal(explicitCounter.offer.priceBasis, 'price-per-100g');
+  assert.equal(explicitCounter.offer.planningStatus, 'needs-review');
+});
+
+test('Kaufland-XTRA, Punkte, Mindestkauf, Kauflimit und Prozentaktionen bleiben getrennt', () => {
+  const kaufland = { key: 'Kaufland-Wuerzburg', label: 'Kaufland Würzburg', store: 'Kaufland', interpretationProfile: 'kaufland-v1' };
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all', imageOcr: { enabled: false, required: false } });
+  const butter = assessOffer({
+    name: 'Weihenstephan Butter',
+    text: 'Weihenstephan Butter oder Die Streichzarte\n250 g\nAktionspreis 1,29 € statt 2,99 €\nKaufland Card XTRA 1,15 €\nmaximal 4 Stück pro Kunde',
+    priceText: 'Aktionspreis 1,29 € statt 2,99 € Kaufland Card XTRA 1,15 €',
+    packSizeText: '250 g',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/butter'
+  }, kaufland, config, '2026-11-27T08:00:00Z').offer;
+  assert.equal(butter.price, 1.29);
+  assert.equal(butter.previousPrice, 2.99);
+  assert.equal(butter.loyaltyPrice, 1.15);
+  assert.equal(butter.loyaltyProgram, 'Kaufland Card XTRA');
+  assert.equal(butter.loyaltyActivationRequired, false);
+  assert.equal(butter.activationRequired, false);
+  assert.match(butter.purchaseLimitText, /maximal 4 Stück pro Kunde/i);
+
+  const oil = assessOffer({
+    name: 'Thomy Sonnenblumenöl',
+    text: 'Thomy Sonnenblumenöl 750 ml\nAktionspreis 2,49 €\nKaufland Card XTRA 1,99 €\nXTRA-Coupon aktivieren und 60 XTRA-Punkte einlösen',
+    priceText: 'Aktionspreis 2,49 € Kaufland Card XTRA 1,99 €',
+    packSizeText: '750 ml',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/oil'
+  }, kaufland, config, '2026-11-27T08:00:00Z').offer;
+  assert.equal(oil.price, 2.49);
+  assert.equal(oil.loyaltyPrice, 1.99);
+  assert.equal(oil.loyaltyActivationRequired, true);
+  assert.equal(oil.loyaltyPointsRequired, 60);
+  assert.equal(oil.activationRequired, false);
+  assert.equal(oil.planningStatus, 'ready');
+
+  const free = assessOffer({
+    name: 'K-Classic Kaffeeweißer',
+    text: 'K-Classic Kaffeeweißer 250-g-Dose GRATIS\nFür mindestens 10 € Einkauf\n180 XTRA-Punkte aktivieren',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/freebie'
+  }, kaufland, config, '2026-11-27T08:00:00Z');
+  assert.equal(free.offer, undefined);
+  assert.equal(free.reviewItem.evidence.price.minimumPurchaseAmount, 10);
+  assert.equal(free.reviewItem.evidence.price.loyaltyPointsRequired, 180);
+
+  const brandDiscount = assessOffer({
+    name: 'Popp Feinkost',
+    text: 'Popp Feinkost: 25 % Rabatt auf alle Artikel',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/popp'
+  }, kaufland, config, '2026-11-27T08:00:00Z');
+  assert.equal(brandDiscount.offer, undefined);
+  assert.equal(brandDiscount.reviewItem.price, null);
+  assert.equal(brandDiscount.reviewItem.evidence.price.discountPercent, 25);
+
+  const netto = assessOffer({
+    name: 'Butter',
+    text: 'Butter 250 g\nAktionspreis 1,29 €\nKaufland Card XTRA 1,15 €',
+    priceText: 'Aktionspreis 1,29 € Kaufland Card XTRA 1,15 €',
+    packSizeText: '250 g',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/netto-butter'
+  }, { key: 'Netto-Thuengersheim', store: 'Netto Marken-Discount' }, config, '2026-11-27T08:00:00Z').offer;
+  assert.equal(netto.loyaltyPrice, null);
+  assert.equal(netto.discountPercent, null);
 });
 
 test('relative KaufDA-Gültigkeit wird anhand des Abrufzeitpunkts datiert', () => {
@@ -372,6 +618,68 @@ test('Dokument trennt Karten, erkannte Angebote, Lebensmittel und Prüfstatus', 
   assert.equal(document.summary.targetReachedCount, 1);
   assert.equal(document.summary.completenessStatus, 'complete');
   assert.equal(validateOutputDocument(document).valid, true);
+});
+
+test('Inkomplette Erfassung macht Feed-Planungsabdeckung nur teilweise vollständig', () => {
+  const offer = { ...normalizeOffer(fixture.cards[0], market, mergeConfig()), marketLocationStatus: 'matched' };
+  const document = buildOffersDocument({
+    config: mergeConfig(),
+    results: [{
+      market: 'Kaufland Würzburg',
+      marketKey: 'Kaufland-Wuerzburg',
+      locationStatus: 'matched',
+      completenessStatus: 'incomplete',
+      targetReached: false,
+      expectedPageCount: 82,
+      pageTraversalStatus: 'not-traversed',
+      errors: [],
+      offers: [offer],
+      reviewItems: []
+    }],
+    offers: [offer],
+    fetchedAt: fixture.capturedAt
+  });
+  assert.equal(document.summary.planningReadyOfferCount, 1);
+  assert.equal(document.summary.planningReviewOfferCount, 0);
+  assert.equal(document.summary.completenessStatus, 'incomplete');
+  assert.equal(document.summary.planningCompletenessStatus, 'partial');
+  assert.equal(validateOutputDocument(document).warnings.some((warning) => /kein negatives Angebot/.test(warning)), true);
+
+  const noDetectedOffers = buildOffersDocument({
+    config: mergeConfig(),
+    results: [{ market: 'Kaufland Würzburg', marketKey: 'Kaufland-Wuerzburg', completenessStatus: 'incomplete', errors: [], offers: [], reviewItems: [] }],
+    offers: [],
+    fetchedAt: fixture.capturedAt
+  });
+  assert.equal(noDetectedOffers.summary.planningCompletenessStatus, 'partial');
+  assert.equal(noDetectedOffers.summary.completenessStatus, 'incomplete');
+  assert.equal(validateOutputDocument(noDetectedOffers).errors.some((error) => /summary\.planningCompletenessStatus/.test(error)), false);
+});
+
+test('Prospektseitenzahl blockiert keinen nachweislich ausgeschöpften Kachelfeed', () => {
+  const offer = { ...normalizeOffer(fixture.cards[0], market, mergeConfig()), marketLocationStatus: 'matched' };
+  const completenessStatus = marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', scrollExhausted: true });
+  const document = buildOffersDocument({
+    config: mergeConfig(),
+    results: [{
+      market: 'Kaufland Würzburg',
+      marketKey: 'Kaufland-Wuerzburg',
+      completenessStatus,
+      expectedPageCount: 82,
+      expectedCountKind: 'prospect-pages',
+      targetReached: false,
+      scrollExhausted: true,
+      errors: [],
+      offers: [offer],
+      reviewItems: []
+    }],
+    offers: [offer],
+    fetchedAt: fixture.capturedAt
+  });
+  assert.equal(document.summary.targetReachedCount, 0);
+  assert.equal(document.summary.targetPageCount, 82);
+  assert.equal(document.summary.completenessStatus, 'complete');
+  assert.equal(document.summary.planningCompletenessStatus, 'complete');
 });
 
 test('Kategorieumfang darf klassifikatorisch unsichere Karten veröffentlichen', () => {

@@ -57,10 +57,12 @@
         "required": ["marketKey", "locationStatus", "completenessStatus"],
         "properties": {
           "marketKey": { "type": ["string", "null"] },
+          "collectionMode": { "enum": ["tiles", "prospect"] },
           "offerCategory": { "type": ["string", "null"] },
           "offerCategoryStatus": { "enum": ["not-attempted", "selected", "unavailable", "failed"] },
           "categoryScoped": { "type": "boolean" },
           "categoryOfferCount": { "type": "integer", "minimum": 0 },
+          "scrollExhausted": { "type": "boolean" },
           "locationStatus": { "enum": ["matched", "unknown", "mismatch"] },
           "completenessStatus": { "enum": ["complete", "incomplete", "failed"] }
         },
@@ -96,9 +98,18 @@
           "priceLabel": { "type": ["string", "null"] },
           "currency": { "const": "EUR" },
           "discountAmount": { "type": ["number", "null"], "minimum": 0 },
+          "discountPercent": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
           "basePrice": { "type": ["number", "null"], "minimum": 0 },
           "previousPrice": { "type": ["number", "null"], "minimum": 0 },
           "priceType": { "type": ["string", "null"] },
+          "priceBasis": { "enum": ["offer-pack", "multipack-total", "price-per-100g", "weight-based-unit-unknown", "conditional-coupon"] },
+          "activationRequired": { "type": "boolean" },
+          "loyaltyPrice": { "type": ["number", "null"], "minimum": 0 },
+          "loyaltyProgram": { "type": ["string", "null"] },
+          "loyaltyActivationRequired": { "type": "boolean" },
+          "loyaltyPointsRequired": { "type": ["integer", "null"], "minimum": 0 },
+          "minimumPurchaseAmount": { "type": ["number", "null"], "minimum": 0 },
+          "purchaseLimitText": { "type": ["string", "null"] },
           "status": { "enum": ["verified", "needs-review"] },
           "planningStatus": { "enum": ["ready", "needs-review"] },
           "pack": { "type": ["string", "null"] },
@@ -110,6 +121,7 @@
           "unitPriceUnit": { "type": ["string", "null"] },
           "unitPriceText": { "type": ["string", "null"] },
           "sourceUrl": { "type": "string", "pattern": "^https://(?:www\\.)?kaufda\\.de/" },
+          "sourcePage": { "type": ["string", "null"], "format": "uri" },
           "source": { "type": ["string", "null"] },
           "sourceId": { "type": ["string", "null"] },
           "capturedAt": { "type": "string", "format": "date-time" },
@@ -128,6 +140,34 @@
             "additionalProperties": true
           },
           "fieldStatus": { "type": "object" },
+          "evidence": {
+            "type": "object",
+            "required": ["visibleText", "price", "packaging", "imageProduct", "market", "validity", "sourcePage"],
+            "properties": {
+              "visibleText": { "type": ["string", "null"] },
+              "price": {
+                "type": "object",
+                "required": ["currentPrice", "previousPrice", "basis", "activationRequired"],
+                "properties": {
+                  "visibleText": { "type": ["string", "null"] },
+                  "currentPrice": { "type": ["number", "null"], "minimum": 0 },
+                  "previousPrice": { "type": ["number", "null"], "minimum": 0 },
+                  "unitPrice": { "type": ["number", "null"], "minimum": 0 },
+                  "unitPriceUnit": { "type": ["string", "null"] },
+                  "basis": { "type": "string" },
+                  "activationRequired": { "type": "boolean" },
+                  "weightUnitUnknown": { "type": "boolean" }
+                },
+                "additionalProperties": true
+              },
+              "packaging": { "type": "object" },
+              "imageProduct": { "type": "object" },
+              "market": { "type": "object" },
+              "validity": { "type": "object" },
+              "sourcePage": { "type": ["string", "null"], "format": "uri" }
+            },
+            "additionalProperties": true
+          },
           "marketLocationStatus": { "enum": ["matched", "unknown"] }
         },
         "additionalProperties": false
