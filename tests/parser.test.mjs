@@ -34,6 +34,7 @@ import {
   validateOutputDocument
 } from '../src/index.mjs';
 import { extractTesseractLines, fetchTrustedImage, matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
+import { parseCliArgs } from '../src/cli-args.mjs';
 
 const fixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-visible-cards.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -43,6 +44,20 @@ const market = {
   store: 'Lidl',
   url: 'https://www.kaufda.de/search?query=Lidl&city=Zellingen&zip=97225'
 };
+
+test('CLI erkennt ein alleinstehendes Flag am Argumentende', () => {
+  assert.deepEqual(parseCliArgs(['parse', '--market', 'Kaufland-Wuerzburg', '--debug-prospect']), {
+    _: ['parse'],
+    market: 'Kaufland-Wuerzburg',
+    'debug-prospect': true
+  });
+  assert.deepEqual(parseCliArgs(['--scope=kaufland', '--headed', '--output', 'offers.json']), {
+    _: [],
+    scope: 'kaufland',
+    headed: true,
+    output: 'offers.json'
+  });
+});
 
 test('Playwright-Lauf bleibt im einheitlichen KaufDA-Kartenlayout', () => {
   const defaults = buildBrowserContextOptions(mergeConfig());

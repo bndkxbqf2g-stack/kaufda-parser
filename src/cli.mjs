@@ -1,21 +1,8 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { parseCliArgs } from './cli-args.mjs';
 import { loadConfig, mergeConfig, mergeMarketDocuments, runParser, validateConfig, validateOutputDocument } from './index.mjs';
-
-function args(argv) {
-  const result = { _: [] };
-  for (let index = 0; index < argv.length; index += 1) {
-    const item = argv[index];
-    if (!item.startsWith('--')) {
-      result._.push(item);
-      continue;
-    }
-    const [key, inline] = item.slice(2).split('=', 2);
-    result[key] = inline ?? (argv[index + 1]?.startsWith('--') ? true : argv[++index]);
-  }
-  return result;
-}
 
 function help() {
   console.log(`kaufda-parser ${'0.2.0'}
@@ -112,7 +99,7 @@ async function init(options) {
 }
 
 async function main() {
-  const options = args(process.argv.slice(2));
+  const options = parseCliArgs(process.argv.slice(2));
   const command = options._[0];
   if (!command || command === 'help' || options.help) return help();
 
