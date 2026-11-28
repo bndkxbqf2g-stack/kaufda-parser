@@ -1339,7 +1339,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   };
 }
 
-export async function collectProspectOffersFromPage(page, market, configInput = {}) {
+export async function collectProspectOffersFromPage(page, market, configInput = {}, { debugProspect = false } = {}) {
   const config = mergeConfig(configInput);
   const waitMs = Math.max(0, Number(market.prospectPageWaitMs ?? 900));
   const initialText = await page.locator('body').innerText().catch(() => '');
@@ -1365,7 +1365,8 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
     packLines: 0,
     assignedPackLines: 0,
     verifiedProductRegions: 0,
-    pageDetails: []
+    pageDetails: [],
+    debugPages: []
   };
   if (!Number.isInteger(expectedPageCount) || expectedPageCount < 1) {
     return {
@@ -1440,6 +1441,26 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
         ocrDiagnostics.assignedPriceLines += pageDetails.assignedPriceLineCount;
         ocrDiagnostics.packLines += pageDetails.packLineCount;
         ocrDiagnostics.assignedPackLines += pageDetails.assignedPackLineCount;
+        if (debugProspect && pageNumber === 3) {
+          const lineKey = (line) => `${line.text}|${line.box.x},${line.box.y},${line.box.width},${line.box.height}`;
+          const assignedKeys = new Set(assignedLines.map(lineKey));
+          ocrDiagnostics.debugPages.push({
+            firstPage: pageNumber,
+            lastPage: Math.min(expectedPageCount, pageNumber + 1),
+            ocrLines: ocrLines.map((line) => ({
+              text: line.text,
+              confidence: line.confidence,
+              box: line.box,
+              assigned: assignedKeys.has(lineKey(line))
+            })),
+            regions: grouped.map((region) => ({
+              name: region.name,
+              box: { x: region.x, y: region.y, width: region.width, height: region.height },
+              text: region.text,
+              ocrLines: region.ocrLines
+            }))
+          });
+        }
         const medianX = grouped.length ? [...grouped].map((region) => region.x + region.width / 2).sort((a, b) => a - b)[Math.floor(grouped.length / 2)] : (page.viewportSize()?.width ?? 870) / 2;
         const headerBySide = ['left', 'right'].map((side) => {
           const sideRegions = grouped.filter((region) => (region.x + region.width / 2 < medianX) === (side === 'left'));
@@ -1592,7 +1613,7 @@ export function assertSafeOutputTarget(configInput, outputPath, marketKey = null
   }
 }
 
-export async function runParser(configInput, { outputPath = null, marketKey = null, headed = false } = {}) {
+export async function runParser(configInput, { outputPath = null, marketKey = null, headed = false, debugProspect = false } = {}) {
   const config = mergeConfig(configInput);
   assertSafeOutputTarget(config, outputPath, marketKey);
   const { chromium } = await import('playwright');
@@ -1670,7 +1691,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         let scan;
         if (market.collectionMode === 'prospect') {
           if (!await activateProspectTab()) throw new Error('Kaufland-Prospektansicht war im ausgewählten Markt nicht sichtbar.');
-          scan = await collectProspectOffersFromPage(page, market, config);
+          scan = await collectProspectOffersFromPage(page, market, config, { debugProspect });
           scan.offerCategory = null;
           scan.offerCategoryStatus = 'not-attempted';
           scan.collectionMode = 'prospect';

@@ -28,6 +28,7 @@ jobs:
     outputs:
       market_keys: ${{ steps.selection.outputs.market_keys }}
       publish: ${{ steps.selection.outputs.publish }}
+      debug_prospect: ${{ steps.selection.outputs.debug_prospect }}
     steps:
       - id: selection
         env:
@@ -36,9 +37,11 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$RUN_SCOPE" = "all" ]; then
             echo 'market_keys=["Lidl-Zellingen","Aldi-Sued-Zellingen","Edeka-Zellingen","Netto-Thuengersheim","Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
             echo 'publish=true' >> "$GITHUB_OUTPUT"
+            echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
           else
             echo 'market_keys=["Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
             echo 'publish=false' >> "$GITHUB_OUTPUT"
+            echo 'debug_prospect=true' >> "$GITHUB_OUTPUT"
           fi
 
   test-and-validate:
@@ -71,15 +74,21 @@ jobs:
       - name: Markt erfassen
         env:
           MARKET_KEY: ${{ matrix.market }}
+          DEBUG_PROSPECT: ${{ needs.select-markets.outputs.debug_prospect }}
         run: |
           mkdir -p generated/parts
-          node src/cli.mjs parse --config kaufda-parser.config.json --market "$MARKET_KEY" --output "generated/parts/$MARKET_KEY.json"
+          EXTRA_ARGS=()
+          if [ "$DEBUG_PROSPECT" = "true" ]; then EXTRA_ARGS+=(--debug-prospect); fi
+          node src/cli.mjs parse --config kaufda-parser.config.json --market "$MARKET_KEY" --output "generated/parts/$MARKET_KEY.json" "${EXTRA_ARGS[@]}"
       - name: Marktergebnis prüfen
         env:
           MARKET_KEY: ${{ matrix.market }}
         run: node src/cli.mjs verify --config kaufda-parser.config.json --allow-empty --input "generated/parts/$MARKET_KEY.json"
       - name: Marktstatus ausgeben
-        run: node -e "const d=require('./generated/parts/${{ matrix.market }}.json'); console.log(JSON.stringify({summary:d.summary,market:d.markets[0],offers:d.offers.map(({product,price,pack,sourcePage,planningStatus})=>({product,price,pack,sourcePage,planningStatus}))}, null, 2));"
+        env:
+          MARKET_KEY: ${{ matrix.market }}
+          DEBUG_PROSPECT: ${{ needs.select-markets.outputs.debug_prospect }}
+        run: node --input-type=module -e 'import fs from "node:fs"; const d=JSON.parse(fs.readFileSync(`generated/parts/${process.env.MARKET_KEY}.json`, "utf8")); const includeEvidence=process.env.DEBUG_PROSPECT === "true"; console.log(JSON.stringify({summary:d.summary,market:d.markets[0],offers:d.offers.map(offer=>({product:offer.product,price:offer.price,pack:offer.pack,sourcePage:offer.sourcePage,planningStatus:offer.planningStatus,...(includeEvidence?{evidence:offer.evidence,imageProductStatus:offer.fieldStatus?.imageProduct}: {})}))}, null, 2));'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: market-${{ matrix.market }}
