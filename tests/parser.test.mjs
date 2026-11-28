@@ -991,6 +991,32 @@ test('EDEKA-Wein- und Bierbegriffe blockieren keine Lebensmittelkomposita', () =
   }
 });
 
+test('EDEKA blockiert klare Wein- und Bierangebote aus dem Prospekttext', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const cases = [
+    { name: 'Ortswein', productDescription: 'verschiedene Rebsorten, deutscher Qualitätswein, Franken 0,75 Liter Bocksbeutel' },
+    { name: 'Frankenseele Rotwein', productDescription: 'deutscher Qualitätswein Franken, trocken 0,75 Liter Flasche' },
+    { name: 'Winzer Glühwein rot', productDescription: '0,25 Liter Flasche' },
+    { name: 'Premium Pils', productDescription: '20 x 0,5 Liter Kasten + 3,10 Pfand' },
+    { name: 'Mönchshof', productDescription: 'verschiedene Sorten, ausgenommen Bockbier, 20 x 0,5 Liter Kasten' },
+    { name: 'Pure Malt Lager Beer', productDescription: '20 x 0,4 Liter Kasten + 3,10 Pfand' }
+  ];
+
+  for (const item of cases) {
+    const result = assessOffer({
+      name: item.name,
+      text: `9,99 € ${item.name}\n${item.productDescription}`,
+      productDescription: item.productDescription,
+      priceText: '9,99 €',
+      sourceUrl: edeka.url
+    }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+    assert.equal(result.classification.label, 'nonfood', item.name);
+    assert.equal(result.state, 'rejected', item.name);
+  }
+});
+
 test('EDEKA benötigt ein eindeutiges Packmaß und erkennt klar ausgewiesene Stückware', () => {
   const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
   const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
