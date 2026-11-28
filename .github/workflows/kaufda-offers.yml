@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: 'Kaufland einzeln prüfen oder alle Märkte zusammen aktualisieren'
+        description: 'Einen Markt einzeln prüfen oder alle Märkte zusammen aktualisieren'
         type: choice
         options:
-          - kaufland
           - all
+          - lidl
+          - aldi-sued
+          - edeka
+          - netto
+          - kaufland
         default: kaufland
         required: true
   schedule:
@@ -39,9 +43,20 @@ jobs:
             echo 'publish=true' >> "$GITHUB_OUTPUT"
             echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
           else
-            echo 'market_keys=["Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
+            case "$RUN_SCOPE" in
+              lidl) echo 'market_keys=["Lidl-Zellingen"]' >> "$GITHUB_OUTPUT" ;;
+              aldi-sued) echo 'market_keys=["Aldi-Sued-Zellingen"]' >> "$GITHUB_OUTPUT" ;;
+              edeka) echo 'market_keys=["Edeka-Zellingen"]' >> "$GITHUB_OUTPUT" ;;
+              netto) echo 'market_keys=["Netto-Thuengersheim"]' >> "$GITHUB_OUTPUT" ;;
+              kaufland) echo 'market_keys=["Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT" ;;
+              *) echo "Unbekannter Marktumfang: $RUN_SCOPE" >&2; exit 1 ;;
+            esac
             echo 'publish=false' >> "$GITHUB_OUTPUT"
-            echo 'debug_prospect=true' >> "$GITHUB_OUTPUT"
+            if [ "$RUN_SCOPE" = "kaufland" ]; then
+              echo 'debug_prospect=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   test-and-validate:

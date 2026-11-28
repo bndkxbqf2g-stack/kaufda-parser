@@ -20,7 +20,7 @@ node src/cli.mjs parse --config kaufda-parser.config.json --output generated/off
 node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.json
 ```
 
-Für die sichtbare Fehlersuche kann `--headed` ergänzt werden. Ein einzelner Markt lässt sich mit `--market <key>` prüfen, ohne alle Märkte erneut zu starten. Bei einem Einzelmarktlauf muss `--output` auf einen separaten Testpfad zeigen; der konfigurierte Gesamtfeed kann so nicht versehentlich durch nur einen Markt ersetzt werden.
+Für die sichtbare Fehlersuche kann `--headed` ergänzt werden. Ein einzelner Markt lässt sich mit `--market <key>` prüfen, ohne alle Märkte erneut zu starten.
 
 ## Konfigurierte Bezugsquellen
 
@@ -34,7 +34,7 @@ Die Konfiguration enthält die gewünschten öffentlichen Suchseiten für:
 
 Die tatsächliche KaufDA-Quelle, der sichtbare Standort, die Entfernung und die Filialadresse werden pro Lauf im Marktstatus gespeichert. Eine konfigurierte Suchseite ist deshalb kein Beweis, dass in jedem Lauf eine passende Filiale oder ein vollständiger Prospekt geladen wurde. Das Ergebnis bleibt bei fehlendem Standortbezug unvollständig und wird nicht als vollständig ausgegeben.
 
-### Einheitlicher Kartenlauf für Kachelmärkte
+### Einheitlicher Kartenlauf
 
 Der Parser öffnet jede KaufDA-Quelle standardmäßig mit einer reproduzierbaren Browserbreite (`870 × 675`). In dieser Breite zeigt KaufDA vier gut lesbare Angebotskacheln nebeneinander. Nach dem Reiter **Angebote** wird zusätzlich die sichtbare Kategorie **Lebensmittel und Getränke** ausgewählt. Dadurch werden die Angebotskacheln über alle Märkte mit demselben Kartenlayout eingesammelt.
 
@@ -66,14 +66,9 @@ Ein einzelner Markt darf `browser` oder `offerCategory` überschreiben, wenn Kau
 
 Wenn die Kategorie **Lebensmittel und Getränke** erfolgreich ausgewählt wurde, ist sie der Umfangsfilter. Alle sichtbaren Karten mit Produkt und Preis werden als `offers` übernommen. Die Wortlistenklassifikation bleibt als `classification` und Qualitätswarnung erhalten, entfernt eine Karte in diesem Kategorieumfang aber nicht nochmals. Ist der Kategoriechip nicht verfügbar, fällt der Parser aus Sicherheitsgründen auf die Lebensmittelklassifikation zurück.
 
-### Kaufland-Prospektlauf
+Die Produktbezeichnung wird zusätzlich global aus dem Originalbild jeder Angebotskachel per lokaler OCR gelesen. Die kleine Rastervorschau wird dafür nicht verwendet; die `main.jpg`-Quelle wird ohne KaufDA-Login verarbeitet. Der sichtbare Kartenname wird über `fieldStatus.imageProduct` als `verified`, `unverified` oder `failed` dokumentiert. Im ausgewählten Kategorieumfang ist OCR standardmäßig nur eine Warnung (`blockPlanning: false`); die Karte bleibt planungsrelevant, wenn Produkt, Preis, Quelle und Marktstandort vorhanden sind. Im strengeren Fallback ohne Kategoriechip kann OCR weiterhin die Planung blockieren.
 
-Die OCR läuft lokal mit Tesseract.js im GitHub-Runner. Es werden keine Bilder an einen externen KI-Dienst übertragen. Der Bildabruf akzeptiert ausschließlich HTTPS vom Bonial-Bildhost, prüft jede Weiterleitung erneut und begrenzt Laufzeit sowie Dateigröße. `fieldStatus.imageProduct` dokumentiert `verified`, `unverified`, `failed`, `missing` oder `not-required`; die technischen OCR-Texte und Bild-URLs werden nicht veröffentlicht.
-`Kaufland-Wuerzburg` ist ausdrücklich auf `collectionMode: "prospect"` gesetzt. Der Parser öffnet dort den Reiter **Prospekt**, besucht die Prospektseiten in Doppelseiten-Schritten und wertet die sichtbaren Produktbereiche mit lokaler Tesseract-OCR aus. Netto und die anderen Märkte bleiben im einheitlichen Kachelmodus. `collectionMode` wird im Marktstatus mit ausgegeben.
-
-Die OCR ordnet Text nur den sichtbaren Angebots-Overlaybereichen zu. Die Erfassung markiert den Markt vorerst als `incomplete`: Alle Prospektseiten besucht zu haben, beweist noch nicht, dass alle Angebotsblöcke erkannt wurden. Ein Angebot ist nur dann automatisch planungsbereit, wenn Produktbild/OCR, Preis, Packung, Quelle und Marktzuordnung die vorhandenen Prüfregeln erfüllen. Der Lauf berechnet keine Preise aus pauschalen Prozentaktionen und behandelt nicht erkannte Artikel nicht als „nicht im Angebot“.
-
-Die Kaufland-Regeln und ihre Feed-Felder sind in [`docs/kaufland-interpretation.md`](docs/kaufland-interpretation.md) beschrieben. Für Netto wird dieses Interpretationsprofil nicht aktiviert.
+Die OCR läuft lokal mit Tesseract.js im GitHub-Runner. Es werden keine Bilder an einen externen KI-Dienst übertragen. `fieldStatus.imageProduct` dokumentiert `verified`, `unverified`, `failed`, `missing` oder `not-required`; die technischen OCR-Texte und Bild-URLs werden nicht veröffentlicht.
 
 ## Angebotsvertrag für Vorratskompass
 
@@ -86,15 +81,11 @@ Jedes übernommene Lebensmittelangebot wird aus einer festen Veröffentlichungs-
 - `pack`, `packSize`, `packSizeValue`, `packSizeUnit` und `packCount`;
 - `unitPrice`, `unitPriceUnit` und `unitPriceText`;
 - `validFrom`, `validUntil` und `validTo`;
-- Markt-/Quellenfelder (`market`, `marketKey`, `store`, `sourceUrl`, `sourcePage`, `source`, `sourceId`);
-- `priceBasis` und `activationRequired` für Multipack-Gesamtpreise, eindeutig ausgewiesene 100-g-Preise, bedingte Couponpreise und unklare Thekenpreise;
-- `evidence` mit sichtbarem Kacheltext, Preis- und Packungsbeleg, Bildbestätigungsstatus, Markt-/Standortbeleg, Gültigkeit und Quellseite.
+- Markt-/Quellenfelder (`market`, `marketKey`, `store`, `sourceUrl`, `source`, `sourceId`).
 
-Das Schema bleibt `kaufda-offers/v2`; die zusätzlichen Felder sind optional und rückwärtskompatibel. Bestehende PWA-Feedleser können sie ignorieren. Nicht veröffentlicht werden `rawText`, `imageUrl`, vollständiger OCR-Rohtext, `category`, `priceEvidence` und das interne `validity`-Objekt.
+Zusätzlich bleiben nur die für den sicheren Vertrag erforderlichen technischen Felder erhalten: `id`, `currency`, `capturedAt`, `fetchedAt`, `classification`, `fieldStatus`, `marketLocationStatus`, `status`, `reviewStatus` und `planningStatus`. Nicht veröffentlicht werden unter anderem `rawText`, `imageUrl`, `category`, `priceEvidence` und das interne `validity`-Objekt.
 
 Die Mengen werden semantisch normalisiert: Bei `10 x 20 g = 200-g-Packung` ist `packSizeValue` `200`, `packSizeUnit` `g` und `packCount` `10`. Bei Varianten wie `40-, 45- bzw. 55-g-Packung` bleibt der Wert `null`, `fieldStatus.packSize` wird `ambiguous` und das Angebot bleibt `planningStatus: needs-review`.
-
-Eine getrennte Angabe wie `1-l-Packung` plus `12 Packungen für insgesamt 9,99 €` wird als `packCount: 12`, `pack: 12 × 1 l`, `price: 9.99`, `priceBasis: multipack-total` und mit dem gesondert erkannten Grundpreis gespeichert. Der Gesamtpreis wird damit nicht als Preis einer einzelnen 1-l-Packung ausgegeben. Ein Coupon, der erst aktiviert werden muss, wird mit `activationRequired: true` markiert und bleibt prüfpflichtig. Bei einem Thekenhinweis ohne ausdrücklich lesbare Bezugsmenge wird `priceBasis: weight-based-unit-unknown` gesetzt; ein vermuteter 100-g-Preis wird nicht ergänzt.
 
 Zusätzliche Qualitätsfelder:
 
@@ -117,11 +108,7 @@ Wenn der Kategoriechip erfolgreich ausgewählt wurde, werden auch Karten mit uns
 
 `targetReached` wird nur gesetzt, wenn die sichtbare KaufDA-Zielzahl vorhanden ist und die erfassten Karten diese Zielzahl tatsächlich erreichen. Eine Kartenanzahl ist nicht automatisch eine Zahl gültiger Lebensmittelangebote.
 
-Wenn KaufDA nur eine Anzeige wie `1 / 37` liefert, wird sie als `targetPageCount` mit `expectedCountKind: prospect-pages` gespeichert. Das ist keine Sollzahl für Kacheln in der einheitlichen Angebote-Ansicht. Die Kacheln werden dort per DOM-Erkennung und Scrollen erfasst. `scrollExhausted` dokumentiert, ob am unteren Ende der Kachelliste mehrere Scroll-Schritte ohne neue Karten stabil geblieben sind; ein solcher Lauf kann vollständig sein, auch wenn KaufDA zusätzlich eine Prospektseitenzahl anzeigt. Wird das Scroll-Ende nicht erreicht, bleibt die Erfassung `incomplete`. Das Fehlen eines Produkts in einem Teilfeed ist kein negatives Angebotsergebnis. Ebenso kann `planningCompletenessStatus` bei unvollständiger Markterfassung nicht `complete` sein, auch wenn alle bereits erkannten Angebote einzeln planungsbereit sind. `planningReviewOfferCount` zählt nur prüfpflichtige erkannte Angebote, nicht nicht erfasste Kacheln.
-
-Eine Weiterleitung auf den KaufDA-Einkaufshelfer oder eine Anmeldeseite sowie fehlende Händler-Suchergebnisse werden als Marktfehler gespeichert. Die Feed-Prüfung blockiert dann das Schreiben und die Veröffentlichung des gesamten neuen Laufs, damit ein teilweise ausgefallener Markt nicht unbemerkt durch einen verkleinerten Tagesfeed ersetzt wird. Der zuletzt veröffentlichte Feed bleibt bestehen, bis alle konfigurierten Märkte wieder erfolgreich gelesen werden.
-
-Eine Weiterleitung auf den KaufDA-Einkaufshelfer oder eine Anmeldeseite sowie fehlende Händler-Suchergebnisse werden als Marktfehler gespeichert. Die Feed-Prüfung blockiert dann das Schreiben und die Veröffentlichung des gesamten neuen Laufs, damit ein teilweise ausgefallener Markt nicht unbemerkt durch einen verkleinerten Tagesfeed ersetzt wird. Der zuletzt veröffentlichte Feed bleibt bestehen, bis alle konfigurierten Märkte wieder erfolgreich gelesen werden.
+Wenn KaufDA nur eine Anzeige wie `1 / 37` liefert, wird sie als `targetPageCount` mit `expectedCountKind: prospect-pages` gespeichert. Prospektseiten werden niemals als Angebotskarten gezählt.
 
 ## Belegter Live-Test
 
@@ -139,20 +126,24 @@ Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittel
 
 ## Täglicher kostenloser Workflow
 
-`.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC. Beim manuellen Start ist standardmäßig **Kaufland einzeln** ausgewählt; über den Eingabewert `all` können alle Märkte gestartet werden. Codeänderungen starten keinen Live-Lauf und ändern den Angebotsfeed nicht automatisch.
+`.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC und kann zusätzlich manuell über **Actions → KaufDA-Angebote aktualisieren → Run workflow** gestartet werden.
 
-Der Workflow arbeitet in getrennten Markt-Jobs:
+Der Workflow:
 
-1. Ein Vorlauf führt die Unit-Tests aus und prüft die Konfiguration.
-2. Für jeden ausgewählten Markt läuft ein eigener Job. Kaufland besucht seinen Prospekt; die anderen Märkte lesen sichtbare Angebotskacheln.
-3. Jeder Job prüft sein Zwischenergebnis und lädt eine Marktdatei als Workflow-Artefakt hoch. Ein leerer Marktfeed ist nur in dieser Zwischenstufe zulässig.
-4. Bei einem Kaufland-Einzellauf bleibt das Ergebnis als Markt-Artefakt verfügbar; der gemeinsame Feed wird dabei nicht überschrieben.
-5. Bei Zeitplan oder Auswahl `all` führt der abschließende Job alle fünf Dateien mit `node src/cli.mjs merge` zusammen und prüft den Gesamtfeed. Fehlt ein Markt oder schlägt ein Marktjob fehl, wird kein Teilfeed veröffentlicht.
-6. Erst nach erfolgreicher Gesamtprüfung wird `generated/offers.json` einmalig aktualisiert.
+1. installiert die Abhängigkeiten und führt die Unit-Tests aus;
+2. installiert Chromium für Playwright;
+3. liest die sichtbaren Angebotskacheln im reproduzierbaren Browserlayout und bestätigt den Produktnamen zusätzlich per OCR aus dem Originalbild;
+4. öffnet für erkannte Kategorie-Karten die verlinkte öffentliche KaufDA-Detailansicht;
+5. übernimmt daraus ausschließlich die vereinbarten Produkt-, Beschreibungs-, Preis-, Mengen-, Grundpreis-, Gültigkeits-, Markt- und Quellenfelder;
+6. schreibt zunächst nach `generated/offers.next.json`;
+7. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
+8. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
+9. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
+10. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
 
-Die Marktdateien liegen während des Laufs unter `generated/parts/<marketKey>.json`. Für manuelle Einzelmarkttests stehen `parse --market <key>`, `verify --allow-empty` und `merge --input-dir <directory>` bereit. Die Marktmetadaten `markets[].ocrDiagnostics` zeigen je Prospekt-Doppelseite, wie viele OCR-Zeilen erkannt und Produktregionen zugeordnet wurden.
+Manuell lässt sich unter `scope` ein einzelner Markt (`lidl`, `aldi-sued`, `edeka`, `netto` oder `kaufland`) auswählen. Ein Einzellauf erstellt nur ein Marktartefakt und veröffentlicht den Gesamtfeed nicht. `all` und der tägliche Zeitplan erfassen alle Märkte parallel, führen die Ergebnisse zusammen und veröffentlichen den geprüften Gesamtfeed. Der manuelle Standard bleibt `kaufland`.
 
-Wenn Markt-Schlüssel zur Konfiguration hinzukommen oder sich ändern, muss die Matrixliste im Workflow mit angepasst werden. Der öffentliche Gesamtfeed bleibt weiterhin eine einzige Datei:
+Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
 
 ```text
 https://raw.githubusercontent.com/bndkxbqf2g-stack/kaufda-parser/main/generated/offers.json
