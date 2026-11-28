@@ -1456,6 +1456,63 @@ test('EDEKA setzt widersprüchliche Sparbeträge nicht als sicheren Vorpreis ein
   assert.equal(consistentDiscount.offer.planningStatus, 'ready');
 });
 
+test('EDEKA löst mehrdeutige Kachelpreise anhand gelabelter Detailblöcke auf', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const raw = {
+    name: 'Franken Brunnen Mineralwasser',
+    productDescription: 'Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+    text: '3,00 € sparen! ab 4,99 € Franken Brunnen 7,99 € 1 l = 0,42 Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+    priceText: '3,00 € sparen! 4,99 € 5,99 € 7,99 €',
+    cardPriceText: '3,00 € sparen! ab 4,99 € 7,99 €',
+    packSizeText: '12 x 1 Liter Kasten',
+    priceBlocks: [
+      { amountText: '4,99 €', label: 'Angebotspreis', conditions: 'ab 2 Kästen 1 l = 0,42 €', unitPriceText: '1 l = 0,42 €' },
+      { amountText: '5,99 €', label: 'Angebotspreis', conditions: '1 l = 0,50 €', unitPriceText: '1 l = 0,50 €' },
+      { amountText: '7,99 €', label: 'Regulärer Preis', conditions: '.G. = 7,99' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=5&locality=Zellingen&productId=373640df-ddc5-4eea-82f2-e6f57ce3d71e'
+  };
+  const withDetails = assessOffer(raw, edeka, categoryConfig, '2026-11-28T10:51:54.082Z').offer;
+
+  assert.equal(withDetails.price, 4.99);
+  assert.equal(withDetails.previousPrice, 7.99);
+  assert.equal(withDetails.basePrice, 7.99);
+  assert.equal(withDetails.discountAmount, 3);
+  assert.equal(withDetails.priceLabel, 'Angebotspreis');
+  assert.equal(withDetails.unitPrice, 0.42);
+  assert.equal(withDetails.minimumPurchaseQuantity, 2);
+  assert.equal(withDetails.minimumPurchaseUnit, 'Kästen');
+  assert.equal(withDetails.minimumPurchaseText, 'ab 2 Kästen');
+  assert.equal(withDetails.fieldStatus.price, 'visible');
+  assert.equal(withDetails.packCount, 12);
+  assert.equal(withDetails.packSizeUnit, 'l');
+  assert.equal(withDetails.planningStatus, 'needs-review');
+
+  const forcedReady = {
+    ...withDetails,
+    marketLocationStatus: 'matched',
+    planningStatus: 'ready',
+    reviewStatus: 'ready',
+    status: 'verified'
+  };
+  const invalidReadyDocument = buildOffersDocument({
+    config: categoryConfig,
+    results: [{ marketKey: edeka.key, categoryScoped: true, completenessStatus: 'complete', errors: [] }],
+    offers: [forcedReady],
+    fetchedAt: '2026-11-28T10:51:54.082Z'
+  });
+  assert.match(validateOutputDocument(invalidReadyDocument).errors.join(' '), /Mindestabnahme/);
+
+  const withoutDetails = assessOffer({ ...raw, priceBlocks: undefined }, edeka, categoryConfig, '2026-11-28T10:51:54.082Z').offer;
+  assert.equal(withoutDetails.price, 4.99);
+  assert.equal(withoutDetails.previousPrice, null);
+  assert.equal(withoutDetails.basePrice, null);
+  assert.equal(withoutDetails.fieldStatus.price, 'needs-review');
+  assert.equal(withoutDetails.planningStatus, 'needs-review');
+});
+
 test('Kaufland-Kacheln behalten widersprüchliche Sparpreise zur Prüfung', () => {
   const kaufland = {
     key: 'Kaufland-Wuerzburg',
