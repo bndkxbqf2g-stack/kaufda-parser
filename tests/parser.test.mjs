@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 16549)
-Total output lines: 1331
-
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -633,7 +630,120 @@ test('Aktivierungspflicht und unklarer Thekenpreis bleiben prüfpflichtig', () =
 
 test('Kaufland-XTRA, Punkte, Mindestkauf, Kauflimit und Prozentaktionen bleiben getrennt', () => {
   const kaufland = { key: 'Kaufland-Wuerzburg', label: 'Kaufland Würzburg', store: 'Kaufland', interpretationProfile: 'kaufland-v1' };
-  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all', imageOcr: { enabled: false, required: false } }…1549 tokens truncated…assert.deepEqual(lidlResult.offer.evidence.packaging.inferenceSource, {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all', imageOcr: { enabled: false, required: false } });
+  const butter = assessOffer({
+    name: 'Weihenstephan Butter',
+    text: 'Weihenstephan Butter oder Die Streichzarte\n250 g\nAktionspreis 1,29 € statt 2,99 €\nKaufland Card XTRA 1,15 €\nmaximal 4 Stück pro Kunde',
+    priceText: 'Aktionspreis 1,29 € statt 2,99 € Kaufland Card XTRA 1,15 €',
+    packSizeText: '250 g',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/butter'
+  }, kaufland, config, '2026-11-27T08:00:00Z').offer;
+  assert.equal(butter.price, 1.29);
+  assert.equal(butter.previousPrice, 2.99);
+  assert.equal(butter.loyaltyPrice, 1.15);
+  assert.equal(butter.loyaltyProgram, 'Kaufland Card XTRA');
+  assert.equal(butter.loyaltyActivationRequired, false);
+  assert.equal(butter.activationRequired, false);
+  assert.match(butter.purchaseLimitText, /maximal 4 Stück pro Kunde/i);
+
+  const oil = assessOffer({
+    name: 'Thomy Sonnenblumenöl',
+    text: 'Thomy Sonnenblumenöl 750 ml\nAktionspreis 2,49 €\nKaufland Card XTRA 1,99 €\nXTRA-Coupon aktivieren und 60 XTRA-Punkte einlösen',
+    priceText: 'Aktionspreis 2,49 € Kaufland Card XTRA 1,99 €',
+    packSizeText: '750 ml',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/oil'
+  }, kaufland, config, '2026-11-27T08:00:00Z').offer;
+  assert.equal(oil.price, 2.49);
+  assert.equal(oil.loyaltyPrice, 1.99);
+  assert.equal(oil.loyaltyActivationRequired, true);
+  assert.equal(oil.loyaltyPointsRequired, 60);
+  assert.equal(oil.activationRequired, false);
+  assert.equal(oil.planningStatus, 'ready');
+
+  const free = assessOffer({
+    name: 'K-Classic Kaffeeweißer',
+    text: 'K-Classic Kaffeeweißer 250-g-Dose GRATIS\nFür mindestens 10 € Einkauf\n180 XTRA-Punkte aktivieren',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/freebie'
+  }, kaufland, config, '2026-11-27T08:00:00Z');
+  assert.equal(free.offer, undefined);
+  assert.equal(free.reviewItem.evidence.price.minimumPurchaseAmount, 10);
+  assert.equal(free.reviewItem.evidence.price.loyaltyPointsRequired, 180);
+
+  const brandDiscount = assessOffer({
+    name: 'Popp Feinkost',
+    text: 'Popp Feinkost: 25 % Rabatt auf alle Artikel',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/popp'
+  }, kaufland, config, '2026-11-27T08:00:00Z');
+  assert.equal(brandDiscount.offer, undefined);
+  assert.equal(brandDiscount.reviewItem.price, null);
+  assert.equal(brandDiscount.reviewItem.evidence.price.discountPercent, 25);
+
+  const netto = assessOffer({
+    name: 'Butter',
+    text: 'Butter 250 g\nAktionspreis 1,29 €\nKaufland Card XTRA 1,15 €',
+    priceText: 'Aktionspreis 1,29 € Kaufland Card XTRA 1,15 €',
+    packSizeText: '250 g',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/netto-butter'
+  }, { key: 'Netto-Thuengersheim', store: 'Netto Marken-Discount' }, config, '2026-11-27T08:00:00Z').offer;
+  assert.equal(netto.loyaltyPrice, null);
+  assert.equal(netto.discountPercent, null);
+});
+
+test('relative KaufDA-Gültigkeit wird anhand des Abrufzeitpunkts datiert', () => {
+  assert.deepEqual(parseValidity('Endet morgen', '2026-11-20T07:00:00Z'), {
+    validFrom: null, validUntil: '2026-11-21', status: 'relative', text: 'Endet morgen'
+  });
+  const offer = assessOffer({ name: 'Bio-Mandeldrink', priceText: '1,35 €', validityText: 'Endet morgen', packSizeText: '1 l' }, market, mergeConfig(), '2026-11-20T07:00:00Z');
+  assert.equal(offer.offer.validUntil, '2026-11-21');
+});
+
+test('sichtbare Regelpreise und Packungsbeschreibung werden übernommen', () => {
+  const offer = assessOffer({ name: 'Brauner Rohrzucker', text: 'Brauner Rohrzucker\n0,89 € * 1,29 €\nversch. Sorten; je 500-g-Packung\nkg-Preis 1.78\nEndet morgen' }, market, mergeConfig(), '2026-11-20T07:00:00Z');
+  assert.equal(offer.offer.price, 0.89);
+  assert.equal(offer.offer.basePrice, 1.29);
+  assert.equal(offer.offer.packSize, '500-g-Packung');
+  assert.equal(offer.offer.unitPrice, 1.78);
+  assert.equal(offer.offer.validUntil, '2026-11-21');
+  assert.equal(offer.offer.planningStatus, 'ready');
+});
+
+test('Lidl ergänzt bekannte Lebensmittelbegriffe nur marktspezifisch', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const raw = { name: 'Nutella', text: 'Nutella\n1,99 €\n450 g', priceText: '1,99 €', packSizeText: '450 g', sourceUrl: lidl.url };
+  const lidlResult = assessOffer(raw, lidl, mergeConfig());
+  const edekaResult = assessOffer(raw, edeka, mergeConfig());
+  const gulasch = assessOffer({
+    name: 'Frisches Gulasch, gemischt',
+    text: 'Frisches Gulasch, gemischt\nVom Schwein und Rind. Je 800 g\n7,49 €',
+    productDescription: 'Vom Schwein und Rind. Je 800 g',
+    priceText: '7,49 €',
+    sourceUrl: lidl.url
+  }, lidl, mergeConfig());
+  assert.equal(lidlResult.classification.label, 'food');
+  assert.equal(edekaResult.classification.label, 'uncertain');
+  assert.equal(gulasch.classification.label, 'food');
+});
+
+test('Lidl leitet fehlende Packungseinheit nur mit explizitem Einheitspreis ab', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const raw = {
+    name: 'Naturelle',
+    text: 'Naturelle\nJe 1,5 zzgl. 0.25 Pfand\n0,79 €',
+    productDescription: 'Je 1,5 zzgl. 0.25 Pfand',
+    priceText: '0,79 €',
+    unitPriceText: 'Preis pro Einheit: 1 l = 0,53 €',
+    sourceUrl: lidl.url
+  };
+  const configWithCategory = { ...mergeConfig(), categoryScopeActive: true };
+  const lidlResult = assessOffer(raw, lidl, configWithCategory, '2026-11-20T07:00:00Z');
+  const otherResult = assessOffer(raw, { ...lidl, key: 'Other-Market', inferPackUnitFromUnitPrice: false }, configWithCategory, '2026-11-20T07:00:00Z');
+  assert.equal(lidlResult.offer.pack, '1,5 l');
+  assert.equal(lidlResult.offer.packSizeValue, 1.5);
+  assert.equal(lidlResult.offer.fieldStatus.packSize, 'inferred');
+  assert.deepEqual(lidlResult.offer.evidence.packaging.inferenceSource, {
     type: 'unit-price', visibleText: 'Preis pro Einheit: 1 l = 0,53 €', unit: 'l'
   });
   assert.equal(otherResult.offer.pack, null);
