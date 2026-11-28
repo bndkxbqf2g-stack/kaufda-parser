@@ -165,6 +165,13 @@ function isValidDateOnly(value) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+const kaufdaCalendarDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Berlin', dateStyle: 'short' });
+
+function isOutsideOfferPeriod(offer, date) {
+  const end = offer.validUntil ?? offer.validTo;
+  return (end != null && end < date) || (offer.validFrom != null && offer.validFrom > date);
+}
+
 function stableHash(value) {
   return createHash('sha256').update(String(value)).digest('hex').slice(0, 20);
 }
@@ -421,6 +428,7 @@ export function parseOfferCount(value) {
 
 export function marketCollectionStatus({ loadedCardCount = 0, locationStatus = 'unknown', targetReached = false, scrollExhausted = false, expectedCountKind = null } = {}) {
   if (!loadedCardCount || locationStatus === 'mismatch') return 'failed';
+  if (locationStatus !== 'matched') return 'incomplete';
   const scrollCanConfirmCoverage = expectedCountKind !== 'cards';
   return targetReached || (scrollCanConfirmCoverage && scrollExhausted) ? 'complete' : 'incomplete';
 }
@@ -522,8 +530,9 @@ export function parseValidity(value, referenceDate = new Date()) {
     const word = relative[1].toLocaleLowerCase('de-DE');
     const days = word === 'heute' ? 0 : word === 'morgen' ? 1 : Number(relative[2]);
     if (Number.isFinite(reference.getTime()) && Number.isFinite(days)) {
-      reference.setUTCDate(reference.getUTCDate() + days);
-      return { validFrom: null, validUntil: reference.toISOString().slice(0, 10), status: 'relative', text };
+      const day = new Date(`${kaufdaCalendarDate.format(reference)}T00:00:00.000Z`);
+      day.setUTCDate(day.getUTCDate() + days);
+      return { validFrom: null, validUntil: day.toISOString().slice(0, 10), status: 'relative', text };
     }
   }
   if (/(?:gültig|endet|noch\s+\d+\s+tage)/i.test(text)) {
@@ -990,8 +999,8 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   }
 
   // Für die Rezept- und Einkaufsplanung sind Produkt, aktueller Angebotspreis
-  // und Packungs-/Mengenangabe die Pflichtangaben. Grundpreis und Gültigkeit
-  // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
+  // und Packungs-/Mengenangabe die Pflichtangaben. Eine bekannte Gültigkeit
+  // begrenzt den Zeitraum für die Planung; ein fehlendes Datum bleibt offen.
   // Die Aldi-Kategorie enthält auch lose Ware und variable Gewichte. Ohne
   // eindeutig messbare Packungsgröße ist der Preis nicht planungsbereit.
   const requiresExactPackForPlanning = !categoryScopeActive
@@ -1005,6 +1014,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     && classification.label !== 'nonfood'
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
+    && isValidTimestamp(fetchedAt) && !isOutsideOfferPeriod({ validFrom, validUntil }, kaufdaCalendarDate.format(new Date(fetchedAt)))
   );
   const complete = planningReady;
   const offer = {
@@ -1361,7 +1371,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   while (pass < scroll.maxPasses) {
     addSnapshot(await readKaufdaSnapshot(page));
     const loadedCardCount = rawCards.size;
-    if (expectedCountKind !== 'prospect-pages' && expectedCount != null && expectedCount > 0 && loadedCardCount >= expectedCount) break;
+    if (expectedCountKind === 'cards' && expectedCount > 0 && loadedCardCount >= expectedCount) break;
     const progress = await page.evaluate(({ stepPx }) => {
       const scroller = document.scrollingElement || document.documentElement;
       const before = scroller.scrollTop;
@@ -1403,7 +1413,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   const rejectedCount = assessments.filter((item) => item.classification?.label === 'nonfood' || item.state === 'rejected').length;
   const unrecognizedCount = assessments.filter((item) => item.state === 'unrecognized').length;
   const loadedCardCount = rawCards.size;
-  const targetReached = Boolean(expectedCountKind !== 'prospect-pages' && expectedCount != null && expectedCount > 0 && loadedCardCount >= expectedCount && lastSnapshot.cards.length > 0);
+  const targetReached = Boolean(expectedCountKind === 'cards' && expectedCount > 0 && loadedCardCount >= expectedCount && lastSnapshot.cards.length > 0);
   const warnings = [];
   const errors = [];
   if (!lastSnapshot.cards.length) warnings.push('Keine sichtbaren Angebotskarten erkannt; KaufDA-Struktur möglicherweise geändert.');
@@ -1857,7 +1867,9 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
   const offers = dedupeOffers(results.flatMap((result) => result.offers ?? []));
   const document = buildOffersDocument({ config, results, offers });
   if (outputPath) {
-    const validation = validateOutputDocument(document, { allowEmptyOffers: Boolean(marketKey) });
+    const validation = marketKey
+      ? validateOutputDocument(document, { allowEmptyOffers: true })
+      : validateFullOutputDocument(document, config);
     if (!validation.valid) throw new Error(`Angebotsdatei wird wegen fehlgeschlagener Markt-/Feed-Prüfung nicht geschrieben: ${validation.errors.join('; ')}`);
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
@@ -1947,7 +1959,7 @@ export function mergeMarketDocuments(configInput, documents = []) {
     offers: results.flatMap((result) => result.offers),
     fetchedAt: new Date().toISOString()
   });
-  const validation = validateOutputDocument(merged);
+  const validation = validateFullOutputDocument(merged, config);
   if (!validation.valid) throw new Error(`Zusammengeführter Gesamtfeed ist ungültig: ${validation.errors.join('; ')}`);
   return merged;
 }
@@ -2038,5 +2050,56 @@ export function validateOutputDocument(document, { allowEmptyOffers = false } = 
   if (summary.completenessStatus === 'incomplete') warnings.push('Marktabdeckung ist unvollständig; planungsbereite Angebote sind nur die erkannten positiven Treffer. Fehlende Produkte sind kein negatives Angebotsergebnis.');
   if (summary.planningCompletenessStatus === 'partial') warnings.push('Ein Teil der Angebote benötigt noch eine Mengen-/Packungsprüfung.');
   if (offers.length && readyCount === 0) warnings.push('Kein Angebot ist aktuell für eine automatische Planung freigegeben.');
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+export function validateFullOutputDocument(document, configInput, referenceTime = new Date()) {
+  const { valid: _valid, errors, warnings } = validateOutputDocument(document);
+  const config = mergeConfig(configInput);
+  const configuredMarkets = new Map(config.markets.map((market) => [market.key, market]));
+  const marketByKey = new Map();
+  for (const market of Array.isArray(document?.markets) ? document.markets : []) {
+    const key = market?.marketKey;
+    const expected = configuredMarkets.get(key);
+    if (!expected) {
+      errors.push(`Unbekannter Markt im Gesamtfeed: ${key ?? 'ohne Schlüssel'}.`);
+      continue;
+    }
+    if (marketByKey.has(key)) errors.push(`Doppelter Markt im Gesamtfeed: ${key}.`);
+    marketByKey.set(key, market);
+    if (market.market !== marketLabel(expected) || market.store !== (expected.store ?? marketLabel(expected))) {
+      errors.push(`${key}: Händler bzw. Marktname weicht von der Konfiguration ab.`);
+    }
+    if (market.locationStatus !== 'matched' || matchVisibleLocation(market.visibleLocation, expected.location ?? config.location) !== 'matched') {
+      errors.push(`${key}: Der sichtbare Marktstandort ist nicht bestätigt.`);
+    }
+    if (!Number.isInteger(market.recognizedOfferCount) || market.recognizedOfferCount < 1) {
+      errors.push(`${key}: Keine sichtbare Karte mit Produkt und Preis erkannt.`);
+    }
+    if (market.expectedCountKind === 'cards') {
+      if (!Number.isInteger(market.expectedCardCount) || market.expectedCardCount < 1
+          || !Number.isInteger(market.loadedCardCount) || market.loadedCardCount < market.expectedCardCount
+          || market.targetReached !== true) {
+        errors.push(`${key}: Das sichtbare Kartenziel ist nicht belegt oder wurde nicht erreicht.`);
+      }
+    } else if (market.targetReached === true) {
+      errors.push(`${key}: targetReached benötigt eine sichtbare Kartenzahl als Ziel.`);
+    }
+  }
+  for (const key of configuredMarkets.keys()) {
+    if (!marketByKey.has(key)) errors.push(`Konfigurierter Markt fehlt im Gesamtfeed: ${key}.`);
+  }
+  const date = kaufdaCalendarDate.format(referenceTime);
+  const offers = Array.isArray(document?.offers) ? document.offers : [];
+  for (const [index, offer] of offers.entries()) {
+    if (!offer) continue;
+    const market = marketByKey.get(offer.marketKey);
+    if (!market || offer.market !== market.market || offer.store !== market.store || offer.marketLocationStatus !== market.locationStatus) {
+      errors.push(`offers[${index}] passt nicht zum zugeordneten Markt im Gesamtfeed.`);
+    }
+    if (offer.planningStatus === 'ready' && isOutsideOfferPeriod(offer, date)) {
+      errors.push(`offers[${index}] liegt am ${date} außerhalb seiner Gültigkeit und darf nicht planungsbereit sein.`);
+    }
+  }
   return { valid: errors.length === 0, errors, warnings };
 }

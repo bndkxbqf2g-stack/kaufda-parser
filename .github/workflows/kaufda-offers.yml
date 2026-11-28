@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: 'Einen Markt einzeln prüfen oder alle Märkte zusammen aktualisieren'
+        description: 'Einzelmarkt, Prüfung aller fünf Märkte (all-check) oder Veröffentlichung (all)'
         type: choice
         options:
+          - all-check
           - all
           - lidl
           - aldi-sued
@@ -31,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       market_keys: ${{ steps.selection.outputs.market_keys }}
+      assemble_feed: ${{ steps.selection.outputs.assemble_feed }}
       publish: ${{ steps.selection.outputs.publish }}
       debug_prospect: ${{ steps.selection.outputs.debug_prospect }}
       debug_spread: ${{ steps.selection.outputs.debug_spread }}
@@ -39,9 +41,14 @@ jobs:
         env:
           RUN_SCOPE: ${{ inputs.scope || 'kaufland' }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$RUN_SCOPE" = "all" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$RUN_SCOPE" = "all" ] || [ "$RUN_SCOPE" = "all-check" ]; then
             echo 'market_keys=["Lidl-Zellingen","Aldi-Sued-Zellingen","Edeka-Zellingen","Netto-Thuengersheim","Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
-            echo 'publish=true' >> "$GITHUB_OUTPUT"
+            echo 'assemble_feed=true' >> "$GITHUB_OUTPUT"
+            if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$RUN_SCOPE" = "all" ]; then
+              echo 'publish=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'publish=false' >> "$GITHUB_OUTPUT"
+            fi
             echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
             echo 'debug_spread=' >> "$GITHUB_OUTPUT"
           else
@@ -53,6 +60,7 @@ jobs:
               kaufland) echo 'market_keys=["Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT" ;;
               *) echo "Unbekannter Marktumfang: $RUN_SCOPE" >&2; exit 1 ;;
             esac
+            echo 'assemble_feed=false' >> "$GITHUB_OUTPUT"
             echo 'publish=false' >> "$GITHUB_OUTPUT"
             if [ "$RUN_SCOPE" = "kaufland" ]; then
               echo 'debug_prospect=true' >> "$GITHUB_OUTPUT"
@@ -147,18 +155,17 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
-  publish:
+  verify-feed:
     needs: [parse-market, select-markets]
-    if: needs.select-markets.outputs.publish == 'true'
+    if: needs.select-markets.outputs.assemble_feed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
+      - run: npm ci --no-audit --no-fund
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: market-*
@@ -168,10 +175,29 @@ jobs:
         run: node src/cli.mjs merge --config kaufda-parser.config.json --input-dir generated/parts --output generated/offers.next.json
       - name: Gesamtfeed prüfen
         run: node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.next.json
-      - name: Ergebnis veröffentlichen
-        run: mv generated/offers.next.json generated/offers.json
       - name: Laufdaten ausgeben
-        run: node -e "const d=require('./generated/offers.json'); console.log(JSON.stringify({summary:d.summary,markets:d.markets.map(({market,marketKey,recognizedOfferCount,loadedCardCount,imageOcrAttempted,imageOcrVerified,ocrDiagnostics})=>({market,marketKey,recognizedOfferCount,loadedCardCount,imageOcrAttempted,imageOcrVerified,ocrDiagnostics}))}, null, 2));"
+        run: node -e "const d=require('./generated/offers.next.json'); console.log(JSON.stringify({summary:d.summary,markets:d.markets.map(({market,marketKey,recognizedOfferCount,loadedCardCount,imageOcrAttempted,imageOcrVerified,ocrDiagnostics})=>({market,marketKey,recognizedOfferCount,loadedCardCount,imageOcrAttempted,imageOcrVerified,ocrDiagnostics}))}, null, 2));"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-market-feed
+          path: generated/offers.next.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [verify-feed, select-markets]
+    if: needs.select-markets.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-market-feed
+          path: generated
+      - run: mv generated/offers.next.json generated/offers.json
       - run: git diff --check
       - name: Änderungen veröffentlichen
         run: |

@@ -141,7 +141,9 @@ Der Workflow:
 9. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
 10. überschreibt die bestehende Datei bei einem vollständig fehlgeschlagenen Lauf nicht.
 
-Manuell lässt sich unter `scope` ein einzelner Markt (`lidl`, `aldi-sued`, `edeka`, `netto` oder `kaufland`) auswählen. Ein Einzellauf erstellt nur ein Marktartefakt und veröffentlicht den Gesamtfeed nicht. `all` und der tägliche Zeitplan erfassen alle Märkte parallel, führen die Ergebnisse zusammen und veröffentlichen den geprüften Gesamtfeed. Der manuelle Standard bleibt `kaufland`.
+Manuell lässt sich unter `scope` ein einzelner Markt (`lidl`, `aldi-sued`, `edeka`, `netto` oder `kaufland`) auswählen. Ein Einzellauf erstellt nur ein Marktartefakt. `all-check` erfasst alle fünf Märkte parallel und legt den geprüften Gesamtfeed als Aktionsartefakt `verified-market-feed` ab. `all` und der tägliche Zeitplan veröffentlichen den geprüften Gesamtfeed zusätzlich als `generated/offers.json`. Der manuelle Standard bleibt `kaufland`.
+
+Die Gesamtfeedprüfung verlangt jeden konfigurierten Markt genau einmal, einen bestätigten Standort und mindestens eine erkannte Karte mit Produkt und Preis pro Markt. Eine ausgewiesene Kartenzielzahl muss erreicht sein. Planungsbereite Angebote müssen zum Markt passen und am Prüftag gültig sein, soweit ein Gültigkeitszeitraum sichtbar ist. Eine reine Prospektseitenzahl wird weiterhin getrennt dokumentiert.
 
 Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
 

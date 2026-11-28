@@ -31,6 +31,7 @@ import {
   scoreKaufdaMarketResult,
   scaleOcrLinesToViewport,
   validateConfig,
+  validateFullOutputDocument,
   validateOutputDocument
 } from '../src/index.mjs';
 import { extractTesseractLines, fetchTrustedImage, matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
@@ -476,6 +477,7 @@ test('Prospektseitenzahl ist kein Kachelziel; Scroll-Ende bestimmt die Kachelabd
   assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: false, scrollExhausted: true, expectedCountKind: 'cards' }), 'incomplete');
   assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: true, scrollExhausted: false, expectedCountKind: 'cards' }), 'complete');
   assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', targetReached: false, scrollExhausted: true, expectedCountKind: 'prospect-pages' }), 'complete');
+  assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'unknown', scrollExhausted: true }), 'incomplete');
   assert.equal(marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'mismatch', scrollExhausted: true }), 'failed');
   assert.equal(marketCollectionStatus({ loadedCardCount: 0, locationStatus: 'matched', scrollExhausted: true }), 'failed');
 });
@@ -748,6 +750,7 @@ test('relative KaufDA-Gültigkeit wird anhand des Abrufzeitpunkts datiert', () =
   assert.deepEqual(parseValidity('Endet morgen', '2026-11-20T07:00:00Z'), {
     validFrom: null, validUntil: '2026-11-21', status: 'relative', text: 'Endet morgen'
   });
+  assert.equal(parseValidity('Endet heute', '2026-11-20T23:30:00Z').validUntil, '2026-11-21');
   const offer = assessOffer({ name: 'Bio-Mandeldrink', priceText: '1,35 €', validityText: 'Endet morgen', packSizeText: '1 l' }, market, mergeConfig(), '2026-11-20T07:00:00Z');
   assert.equal(offer.offer.validUntil, '2026-11-21');
 });
@@ -1158,7 +1161,7 @@ test('Angebotsduplikate führen unterschiedliche Packungen und Märkte nicht zus
 });
 
 test('Dokument trennt Karten, erkannte Angebote, Lebensmittel und Prüfstatus', () => {
-  const offer = { ...normalizeOffer(fixture.cards[0], market, mergeConfig()), marketLocationStatus: 'matched' };
+  const offer = { ...assessOffer(fixture.cards[0], market, mergeConfig(), fixture.capturedAt).offer, marketLocationStatus: 'matched' };
   const result = {
     market: 'Lidl Zellingen',
     marketKey: 'Lidl-Zellingen',
@@ -1190,7 +1193,7 @@ test('Dokument trennt Karten, erkannte Angebote, Lebensmittel und Prüfstatus', 
 });
 
 test('Inkomplette Erfassung macht Feed-Planungsabdeckung nur teilweise vollständig', () => {
-  const offer = { ...normalizeOffer(fixture.cards[0], market, mergeConfig()), marketLocationStatus: 'matched' };
+  const offer = { ...assessOffer(fixture.cards[0], market, mergeConfig(), fixture.capturedAt).offer, marketLocationStatus: 'matched' };
   const document = buildOffersDocument({
     config: mergeConfig(),
     results: [{
@@ -1226,7 +1229,7 @@ test('Inkomplette Erfassung macht Feed-Planungsabdeckung nur teilweise vollstän
 });
 
 test('Prospektseitenzahl blockiert keinen nachweislich ausgeschöpften Kachelfeed', () => {
-  const offer = { ...normalizeOffer(fixture.cards[0], market, mergeConfig()), marketLocationStatus: 'matched' };
+  const offer = { ...assessOffer(fixture.cards[0], market, mergeConfig(), fixture.capturedAt).offer, marketLocationStatus: 'matched' };
   const completenessStatus = marketCollectionStatus({ loadedCardCount: 129, locationStatus: 'matched', scrollExhausted: true });
   const document = buildOffersDocument({
     config: mergeConfig(),
@@ -1341,7 +1344,7 @@ test('Teilfeed mit komplett ausgefallenem Markt wird nicht veröffentlicht', () 
   assert.match(validation.errors.join(' '), /Kaufland Würzburg.*fehlgeschlagen/);
 });
 
-test('Einzelmarktergebnisse lassen sich trotz leerem Kaufland-Feed sicher zusammenführen', () => {
+test('Gesamtfeed weist einen Kaufland-Lauf ohne erkannte Produktpreise zurück', () => {
   const config = mergeConfig({
     location: { city: 'Zellingen', zip: '97225', lat: 49.9016992, lng: 9.812895 },
     markets: [
@@ -1359,19 +1362,23 @@ test('Einzelmarktergebnisse lassen sich trotz leerem Kaufland-Feed sicher zusamm
   const offer = { ...normalizeOffer(fixture.cards[0], config.markets[0], config), marketLocationStatus: 'matched' };
   const lidlDocument = buildOffersDocument({
     config,
-    results: [{ market: 'Lidl Zellingen', marketKey: 'Lidl-Zellingen', locationStatus: 'matched', completenessStatus: 'complete', errors: [], recognizedOfferCount: 1, offers: [offer], reviewItems: [] }],
+    results: [{ market: 'Lidl Zellingen', marketKey: 'Lidl-Zellingen', store: 'Lidl', visibleLocation: 'Am Güßgraben 2, 97225 Zellingen-Retzbach', locationStatus: 'matched', completenessStatus: 'complete', errors: [], recognizedOfferCount: 1, offers: [offer], reviewItems: [] }],
     offers: [offer],
     fetchedAt: fixture.capturedAt
   });
   const kauflandDocument = buildOffersDocument({
     config,
-    results: [{ market: 'Kaufland Würzburg', marketKey: 'Kaufland-Wuerzburg', locationStatus: 'matched', completenessStatus: 'incomplete', errors: [], recognizedOfferCount: 0, expectedPageCount: 82, expectedCountKind: 'prospect-pages', offers: [], reviewItems: [] }],
+    results: [{ market: 'Kaufland Würzburg', marketKey: 'Kaufland-Wuerzburg', store: 'Kaufland', visibleLocation: 'Nürnberger Straße 12, 97076 Würzburg-Grombühl', locationStatus: 'matched', completenessStatus: 'incomplete', errors: [], recognizedOfferCount: 0, expectedPageCount: 82, expectedCountKind: 'prospect-pages', offers: [], reviewItems: [] }],
     offers: [],
     fetchedAt: fixture.capturedAt
   });
 
   assert.equal(validateOutputDocument(kauflandDocument).valid, false);
   assert.equal(validateOutputDocument(kauflandDocument, { allowEmptyOffers: true }).valid, true);
+  assert.throws(() => mergeMarketDocuments(config, [kauflandDocument, lidlDocument]), /Kaufland-Wuerzburg: Keine sichtbare Karte mit Produkt und Preis erkannt/);
+  // Gültiger Sonderfall: Sichtbare Karten wurden erkannt und fachlich
+  // verworfen, daher gibt es für diesen Markt keine Lebensmittelangebote.
+  kauflandDocument.markets[0].recognizedOfferCount = 2;
   const merged = mergeMarketDocuments(config, [kauflandDocument, lidlDocument]);
   assert.equal(validateOutputDocument(merged).valid, true);
   assert.equal(merged.summary.marketCount, 2);
@@ -1379,6 +1386,33 @@ test('Einzelmarktergebnisse lassen sich trotz leerem Kaufland-Feed sicher zusamm
   assert.equal(merged.summary.targetPageCount, 82);
   assert.deepEqual(merged.markets.map((item) => item.marketKey), ['Lidl-Zellingen', 'Kaufland-Wuerzburg']);
   assert.throws(() => mergeMarketDocuments(config, [lidlDocument]), /Erwartet wurden 2 Marktdateien/);
+});
+
+test('Gesamtprüfung verlangt Markt, Standort, Kartenziel und gültige Planungsangebote', () => {
+  const configured = { ...market, location: { city: 'Zellingen', zip: '97225' } };
+  const config = mergeConfig({ markets: [configured] });
+  const at = new Date('2026-11-21T22:59:59Z');
+  const offer = { ...assessOffer(fixture.cards[0], configured, config, at.toISOString()).offer, marketLocationStatus: 'matched' };
+  const result = {
+    market: configured.label, marketKey: configured.key, store: configured.store,
+    visibleLocation: 'Am Güßgraben 2, 97225 Zellingen-Retzbach', locationStatus: 'matched',
+    completenessStatus: 'complete', expectedCountKind: 'cards', expectedCardCount: 1,
+    loadedCardCount: 1, recognizedOfferCount: 1, targetReached: true, errors: []
+  };
+  const document = buildOffersDocument({ config, results: [result], offers: [offer], fetchedAt: at.toISOString() });
+  assert.equal(offer.planningStatus, 'ready');
+  assert.equal(validateFullOutputDocument(document, config, at).valid, true);
+  const nextDay = new Date('2026-11-21T23:00:00Z');
+  const expiredAssessment = assessOffer(fixture.cards[0], configured, config, nextDay.toISOString());
+  assert.equal(expiredAssessment.offer.planningStatus, 'needs-review');
+  assert.match(validateFullOutputDocument(document, config, nextDay).errors.join(' '), /außerhalb seiner Gültigkeit/);
+  const errorsFor = (markets, offers = document.offers) => validateFullOutputDocument({ ...document, markets, offers }, config, at).errors.join(' ');
+  assert.match(errorsFor([]), /Konfigurierter Markt fehlt/);
+  assert.match(errorsFor([result, result]), /Doppelter Markt/);
+  assert.match(errorsFor([{ ...result, visibleLocation: 'Würzburg' }]), /Marktstandort ist nicht bestätigt/);
+  assert.match(errorsFor([{ ...result, loadedCardCount: 0 }]), /Kartenziel/);
+  assert.match(errorsFor([{ ...result, expectedCountKind: 'prospect-pages' }]), /targetReached benötigt eine sichtbare Kartenzahl/);
+  assert.match(errorsFor([result], [{ ...offer, store: 'Netto' }]), /passt nicht zum zugeordneten Markt/);
 });
 
 test('Einzelmarktlauf darf den konfigurierten Gesamtfeed nicht überschreiben', () => {
