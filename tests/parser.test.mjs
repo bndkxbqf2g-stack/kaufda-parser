@@ -797,6 +797,77 @@ test('Kaufland-XTRA, Punkte, Mindestkauf, Kauflimit und Prozentaktionen bleiben 
   assert.equal(netto.discountPercent, null);
 });
 
+test('Kaufland trennt XTRA, Angebotspreis und regulären Preis nach sichtbaren Preisblöcken', () => {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const kaufland = { key: 'Kaufland-Wuerzburg', store: 'Kaufland', collectionMode: 'tiles', requirePackForPlanning: true };
+  const nut = assessOffer({
+    name: 'Nuss-Nugat-Creme',
+    text: '1,50 € sparen! ab 1,99 € Nuss-Nugat-Creme 3,99 € cremig-nussiger Brotaufstrich je 500-g-Glas',
+    priceText: '1,50 € sparen! 1,99 € 2,49 € 3,99 €',
+    packSizeText: '500-g-Glas',
+    priceBlocks: [
+      { amountText: '1,99 €', label: 'Sonderpreis', conditions: 'Limitiert max. 3 Stück 50% Preis pro Einheit: (1 kg = 3.98) zum Kaufland Card-Xtra Preis', unitPriceText: 'Preis pro Einheit: (1 kg = 3.98)' },
+      { amountText: '2,49 €', label: 'Angebotspreis', conditions: 'Preis pro Einheit: (1 kg = 4.98)', unitPriceText: 'Preis pro Einheit: (1 kg = 4.98)' },
+      { amountText: '3,99 €', label: 'Regulärer Preis', conditions: '', unitPriceText: '' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?page=59&productId=2f5e2010-1e0f-467e-ae97-1fd864f2f18d'
+  }, kaufland, config, fixture.capturedAt).offer;
+  assert.equal(nut.price, 2.49);
+  assert.equal(nut.loyaltyPrice, 1.99);
+  assert.equal(nut.previousPrice, 3.99);
+  assert.equal(nut.discountAmount, 1.5);
+  assert.equal(nut.unitPrice, 4.98);
+  assert.equal(nut.discountPercent, null);
+  assert.equal(nut.purchaseLimitText, 'XTRA: max. 3 Stück');
+  assert.equal(nut.planningStatus, 'ready');
+
+  const drink = assessOffer({
+    name: 'Pfanner',
+    text: '0,80 € sparen! ab 0,99 € Pfanner Saft-Getränk, versch. Sorten 1-l-Packg.',
+    priceText: '0,80 € sparen! 0,99 € 1,19 € 1,99 €',
+    packSizeText: '1-l-Packg.',
+    priceBlocks: [
+      { amountText: '0,99 €', label: 'Sonderpreis', conditions: '50% XTRA' },
+      { amountText: '1,19 €', label: 'Angebotspreis', conditions: 'Je' },
+      { amountText: '1,99 €', label: 'Regulärer Preis', conditions: '' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?page=5&productId=8f231b07-9f19-41be-8550-6f569ae0abcf'
+  }, kaufland, config, fixture.capturedAt).offer;
+  assert.equal(drink.price, 1.19);
+  assert.equal(drink.loyaltyPrice, 0.99);
+  assert.equal(drink.previousPrice, 1.99);
+  assert.equal(drink.discountAmount, 0.8);
+  assert.equal(drink.unitPrice, null);
+});
+
+test('Ein App-Preis darf für dieselbe Packung nicht gleich hoch oder höher sein', () => {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const kaufland = { key: 'Kaufland-Wuerzburg', store: 'Kaufland' };
+  for (const appPrice of ['1,99', '2,49']) {
+    const raw = {
+      name: 'Nuss-Nugat-Creme',
+      text: `Angebotspreis 1,99 €\nKaufland Card XTRA ${appPrice} €\n500 g`,
+      packSizeText: '500 g',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/nuss-nugat-creme'
+    };
+    const offer = assessOffer(raw, kaufland, config, fixture.capturedAt).offer;
+    assert.equal(offer.price, 1.99);
+    assert.equal(offer.loyaltyPrice, null);
+    assert.equal(offer.planningStatus, 'needs-review');
+  }
+
+  const offer = assessOffer(fixture.cards[0], market, config, fixture.capturedAt).offer;
+  const document = buildOffersDocument({
+    config,
+    results: [{ marketKey: market.key, categoryScoped: true, completenessStatus: 'complete', errors: [] }],
+    offers: [{ ...offer, marketLocationStatus: 'matched', loyaltyPrice: 1.19, loyaltyProgram: 'Lidl Plus' }],
+    fetchedAt: fixture.capturedAt
+  });
+  assert.match(validateOutputDocument(document).errors.join(' '), /App-Preis muss niedriger/);
+  document.offers[0].loyaltyPrice = 0.79;
+  assert.equal(validateOutputDocument(document).valid, true);
+});
+
 test('relative KaufDA-Gültigkeit wird anhand des Abrufzeitpunkts datiert', () => {
   assert.deepEqual(parseValidity('Endet morgen', '2026-11-20T07:00:00Z'), {
     validFrom: null, validUntil: '2026-11-21', status: 'relative', text: 'Endet morgen'

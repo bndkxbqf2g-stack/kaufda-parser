@@ -172,6 +172,12 @@ function isOutsideOfferPeriod(offer, date) {
   return (end != null && end < date) || (offer.validFrom != null && offer.validFrom > date);
 }
 
+function hasConflictingAppPrice(price, loyaltyPrice, activationRequired) {
+  // Bei einem reinen Couponpreis fehlt ein separater Preis ohne App.
+  return activationRequired !== true && Number.isFinite(price) && Number.isFinite(loyaltyPrice)
+    && Math.round(loyaltyPrice * 100) >= Math.round(price * 100);
+}
+
 function stableHash(value) {
   return createHash('sha256').update(String(value)).digest('hex').slice(0, 20);
 }
@@ -417,6 +423,21 @@ function parseKauflandConditions(value = '') {
     purchaseLimitText: limit ? normalizeText(limit[0]) : null,
     discountPercent: percent ? Number(percent[1]) : null
   };
+}
+
+function readKauflandAppPrices(blocks) {
+  if (!Array.isArray(blocks) || blocks.length !== 3) return null;
+  const rows = blocks.map((block) => ({
+    ...block,
+    amount: parsePrice(block.amountText),
+    xtra: /\bxtra\b/i.test(block.conditions) && !/\bohne\s+(?:kaufland\s+card\s+)?xtra\b/i.test(block.conditions)
+  }));
+  if (!rows.every((row) => Number.isFinite(row.amount))) return null;
+  const standard = rows.find((row) => !row.xtra && /^(?:angebotspreis|aktionspreis)$/i.test(row.label)
+    && !/\b(?:ab|mindestens|maximal)\s+\d/i.test(row.conditions));
+  const app = rows.find((row) => row.xtra && /^(?:sonderpreis|angebotspreis|aktionspreis)$/i.test(row.label));
+  const regular = rows.find((row) => !row.xtra && /^regulärer preis$/i.test(row.label));
+  return standard && app && regular ? { standard, app, regular } : null;
 }
 
 function parseOfferCountDetails(value) {
@@ -809,6 +830,8 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const imageOcrBlocksPlanning = (imageOcrRequired && config.imageOcr?.blockPlanning === true)
     || (market.collectionMode === 'prospect' && imageOcrRequired);
   const imageProductStatus = raw.imageProductStatus ?? (imageOcrRequired ? 'missing' : 'not-required');
+  const kaufland = isKauflandMarket(market);
+  const appPriceBlocks = kaufland ? readKauflandAppPrices(raw.priceBlocks) : null;
   const visibleName = chooseName(lines, raw.name);
   const name = visibleName ?? (raw.imageProductStatus === 'verified' ? chooseName([], raw.imageProductName ?? '') : null);
   const reportedPrice = raw.price == null ? null : Number(raw.price);
@@ -820,7 +843,9 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       || (market.normalizeLiterPackUnit === true && /\b\d+(?:[,.]\d+)?\s*liter\b/i.test(line)))
       && !UNIT_PRICE_LINE_RE.test(line))
   ].filter(Boolean).join('\n');
-  const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+  const unit = appPriceBlocks ? parseUnitPrice(appPriceBlocks.standard.unitPriceText)
+    : raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE))
+      : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
   const packInput = packEvidenceText || findPackSizeText(raw.text ?? text);
   const normalizedPackInput = market.normalizeLiterPackUnit === true
     ? packInput.replace(/\bliter\b/gi, 'l')
@@ -846,7 +871,6 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       : canInferBarePiece
         ? parsePackSize('1 Stück')
       : visiblePack;
-  const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
     loyaltyPrice: null,
     loyaltyPriceText: null,
@@ -857,12 +881,36 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     purchaseLimitText: null,
     discountPercent: null
   };
+  if (appPriceBlocks) {
+    const appConditions = parseKauflandConditions(appPriceBlocks.app.conditions);
+    const standardConditions = parseKauflandConditions(appPriceBlocks.standard.conditions);
+    Object.assign(kauflandConditions, {
+      ...standardConditions,
+      loyaltyPrice: appPriceBlocks.app.amount,
+      loyaltyProgram: 'Kaufland Card XTRA',
+      loyaltyActivationRequired: appConditions.loyaltyActivationRequired,
+      loyaltyPointsRequired: appConditions.loyaltyPointsRequired,
+      purchaseLimitText: standardConditions.purchaseLimitText
+        ?? (appConditions.purchaseLimitText ? `XTRA: ${appConditions.purchaseLimitText}` : null)
+    });
+  }
   const priceTextForParsing = kaufland && kauflandConditions.loyaltyPriceText
     ? text.replace(kauflandConditions.loyaltyPriceText, ' ')
     : market.collectionMode === 'prospect'
       ? raw.priceText ?? ''
       : raw.priceText || lines.join('\n');
-  const detailPrice = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  let detailPrice = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  if (appPriceBlocks) {
+    const currentPrice = appPriceBlocks.standard.amount;
+    const previousPrice = appPriceBlocks.regular.amount;
+    const saving = detailPrice.discountAmount;
+    const difference = Math.round(previousPrice * 100) - Math.round(currentPrice * 100);
+    const discountAmount = Number.isFinite(saving) && difference === Math.round(saving * 100) ? saving : null;
+    detailPrice = {
+      currentPrice, previousPrice, discountAmount,
+      type: discountAmount == null ? 'offer-with-previous' : 'discount-with-previous'
+    };
+  }
   const cardPrice = market.key === 'Lidl-Zellingen' ? chooseLidlCardPriceDetails(detailPrice, raw.cardPriceText) : null;
   const parsedPriceDetails = cardPrice ?? detailPrice;
   const { currentPrice, previousPrice, discountAmount } = parsedPriceDetails;
@@ -895,6 +943,11 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       : explicitWeightBasis && unit.unit === '100 g'
         ? unit.amount
         : null;
+  const loyaltyPriceConflict = hasConflictingAppPrice(price, kauflandConditions.loyaltyPrice, activationRequired);
+  const loyaltyPrice = loyaltyPriceConflict ? null : kauflandConditions.loyaltyPrice;
+  const priceReviewReason = loyaltyPriceConflict
+    ? 'Der zugeordnete App-Preis ist nicht niedriger als der Preis ohne App.'
+    : priceArithmeticConflict ? 'Der sichtbare Sparbetrag passt nicht zum zugeordneten Vorpreis.' : null;
   const priceBasis = activationRequired
     ? 'conditional-coupon'
     : pack.count > 1
@@ -951,7 +1004,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name ? (imageOcrRequired && imageProductStatus !== 'verified' ? 'image-unverified' : 'visible') : 'missing',
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
-    price: priceArithmeticConflict || activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
+    price: priceReviewReason || activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
     packSize: canInferPackUnit || canInferSinglePiece || canInferBarePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
@@ -963,12 +1016,12 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       visibleText: normalizeText((cardPrice ? raw.cardPriceText : raw.priceText) ?? '').slice(0, 400) || null,
       currentPrice: Number.isFinite(price) ? price : null,
       previousPrice: priceDetails.previousPrice,
-      ...(priceArithmeticConflict ? {
+      ...(priceReviewReason ? {
         reconciliationStatus: 'needs-review',
-        reviewReason: 'Der sichtbare Sparbetrag passt nicht zum zugeordneten Vorpreis.'
+        reviewReason: priceReviewReason
       } : {}),
       discountPercent: kauflandConditions.discountPercent,
-      loyaltyPrice: kauflandConditions.loyaltyPrice,
+      loyaltyPrice,
       loyaltyProgram: kauflandConditions.loyaltyProgram,
       loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
       loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
@@ -1025,7 +1078,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   if (!name) reasons.push('Produktname fehlt.');
   if (!Number.isFinite(price)) reasons.push('Angebotspreis fehlt oder ist ungültig.');
   if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
-  if (priceArithmeticConflict) reasons.push('Sparbetrag und zugeordneter alter Preis widersprechen sich; Preisbeleg muss geprüft werden.');
+  if (priceReviewReason) reasons.push(priceReviewReason);
   if (activationRequired) reasons.push('Rabatt erfordert eine Aktivierung; der Preis ist nicht ohne Weiteres verfügbar.');
   if (weightUnitUnknown) reasons.push('Gewichtsabhängiger Thekenpreis ohne erkennbare Bezugsmenge.');
   if (recognized && classification.label === 'nonfood') {
@@ -1091,7 +1144,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const foodConfidenceBlocksPlanning = market.requireFoodConfidenceForPlanning === true
     && (classification.label !== 'food' || classification.confidence !== 'high');
   const planningReady = Boolean(
-    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && !priceArithmeticConflict && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
+    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && !priceReviewReason && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
     && classification.label !== 'nonfood'
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
@@ -1106,7 +1159,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name,
     productDescription,
     price,
-    priceLabel: raw.priceLabel || findPriceLabel(lines),
+    priceLabel: appPriceBlocks?.standard.label ?? (raw.priceLabel || findPriceLabel(lines)),
     basePrice,
     previousPrice: priceDetails.previousPrice,
     discountAmount: priceDetails.discountAmount,
@@ -1114,7 +1167,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     priceType: priceDetails.type,
     priceBasis,
     activationRequired: Boolean(activationRequired),
-    loyaltyPrice: kauflandConditions.loyaltyPrice,
+    loyaltyPrice,
     loyaltyProgram: kauflandConditions.loyaltyProgram,
     loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
     loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
@@ -1320,13 +1373,28 @@ async function readKaufdaDetailSnapshot(page, sourceUrl, detailConfig) {
         : '';
       const priceSection = lines.slice(priceStart >= 0 ? priceStart + 1 : 0, priceEnd);
       const unitPriceLine = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
+      const priceHeading = [...document.querySelectorAll('div.text-lg.font-bold')]
+        .find((element) => /^preisdetails$/i.test(element.innerText.trim()));
+      const priceBlocks = [...(priceHeading?.nextElementSibling?.children ?? [])]
+        .filter((block) => block.getBoundingClientRect().height > 0)
+        .map((block) => {
+          const [row, ...context] = [...block.children];
+          const [amount, label] = [...(row?.children ?? [])];
+          const terms = context.map((element) => element.innerText.trim());
+          return {
+            amountText: amount?.innerText.trim() ?? '',
+            label: label?.innerText.trim() ?? '',
+            conditions: terms.join(' '),
+            unitPriceText: terms.find((term) => unitPriceLine.test(term)) ?? ''
+          };
+        });
       const priceLines = priceSection.filter((line) => /€/.test(line) && !unitPriceLine.test(line));
       const discountLines = lines.filter((line) => /€/.test(line) && /sparen/i.test(line));
       const priceText = [...new Set([...discountLines, ...priceLines])].join(' ');
       const unitPriceText = priceSection.find((line) => unitPriceLine.test(line)) || '';
       const priceLabel = priceSection.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis)$/i.test(line)) || null;
       const validityText = lines.find((line) => /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) || '';
-      return { productDescription, priceText, priceLabel, unitPriceText, validityText };
+      return { productDescription, priceText, priceLabel, priceBlocks, unitPriceText, validityText };
     });
     return { skipped: false, ...fields };
   } catch (error) {
@@ -1395,6 +1463,7 @@ async function enrichCardsFromDetails(page, cards, market, config, fetchedAt) {
           productDescription: detail.productDescription || raw.productDescription || '',
           priceText: detail.priceText || raw.priceText || '',
           cardPriceText: raw.priceText,
+          priceBlocks: detail.priceBlocks,
           priceLabel: detail.priceLabel ?? raw.priceLabel ?? null,
           unitPriceText: detail.unitPriceText || raw.unitPriceText || '',
           validityText: detail.validityText || raw.validityText || '',
@@ -2114,6 +2183,7 @@ export function validateOutputDocument(document, { allowEmptyOffers = false } = 
     if (!['verified', 'needs-review'].includes(offer.status)) errors.push(`${prefix}.status ist ungültig.`);
     if (!['ready', 'needs-review'].includes(offer.planningStatus)) errors.push(`${prefix}.planningStatus ist ungültig.`);
     if (offer.activationRequired === true && offer.planningStatus === 'ready') errors.push(`${prefix} darf mit aktivierungspflichtigem Rabatt nicht planningStatus=ready tragen.`);
+    if (hasConflictingAppPrice(offer.price, offer.loyaltyPrice, offer.activationRequired)) errors.push(`${prefix}: Der App-Preis muss niedriger als der Preis ohne App sein.`);
     if (offer.priceBasis === 'multipack-total' && (!Number.isInteger(offer.packCount) || offer.packCount < 2)) errors.push(`${prefix} kennzeichnet einen Multipack-Gesamtpreis ohne bestätigte Multipack-Menge.`);
     if (offer.priceBasis === 'weight-based-unit-unknown' && offer.planningStatus === 'ready') errors.push(`${prefix} darf ohne bestätigte Gewichtsbezugsmenge nicht planningStatus=ready tragen.`);
     const categoryScoped = offer.marketKey != null && marketByKey.get(offer.marketKey)?.categoryScoped === true;
