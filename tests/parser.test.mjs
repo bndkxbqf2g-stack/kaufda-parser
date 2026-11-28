@@ -78,12 +78,16 @@ test('Kaufland verwendet Prospektseiten; Netto bleibt im Kachelmodus', () => {
   const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
   const kaufland = config.markets.find((candidate) => candidate.key === 'Kaufland-Wuerzburg');
   const netto = config.markets.find((candidate) => candidate.key === 'Netto-Thuengersheim');
+  const aldi = config.markets.find((candidate) => candidate.key === 'Aldi-Sued-Zellingen');
   assert.equal(kaufland.collectionMode, 'prospect');
   assert.equal(kaufland.interpretationProfile, 'kaufland-v1');
   assert.equal(netto.collectionMode ?? 'tiles', 'tiles');
+  assert.equal(aldi.interpretationProfile, 'aldi-sued-v1');
   assert.equal(validateConfig(config).valid, true);
   const invalidNettoProfile = validateConfig({ ...config, markets: config.markets.map((candidate) => candidate.key === netto.key ? { ...candidate, collectionMode: 'prospect', interpretationProfile: 'kaufland-v1' } : candidate) });
   assert.equal(invalidNettoProfile.valid, false);
+  const invalidAldiProfile = validateConfig({ ...config, markets: config.markets.map((candidate) => candidate.key === 'Lidl-Zellingen' ? { ...candidate, interpretationProfile: 'aldi-sued-v1' } : candidate) });
+  assert.equal(invalidAldiProfile.valid, false);
 
   const assigned = assignOcrLinesToRegions([
     { text: 'MELITTA', box: { x: 20, y: 20, width: 30, height: 10 } },
@@ -290,6 +294,50 @@ test('Kategorieangebote bleiben trotz OCR-Warnung und fehlender Menge planungsre
   assert.equal(result.offer.fieldStatus.imageProduct, 'unverified');
   assert.equal(result.offer.status, 'verified');
   assert.equal(result.offer.planningStatus, 'ready');
+});
+
+test('ALDI SÜD gibt variable oder fehlende Packungsgrößen nicht planungsbereit frei', () => {
+  const aldi = {
+    key: 'Aldi-Sued-Zellingen',
+    label: 'ALDI SÜD Zellingen',
+    store: 'ALDI SÜD',
+    interpretationProfile: 'aldi-sued-v1',
+    url: 'https://www.kaufda.de/search?query=ALDI+SÜD'
+  };
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all', imageOcr: { enabled: false, required: false } });
+  const looseProduceResult = assessOffer({
+    name: 'Ananas, lose',
+    text: 'Ananas, lose\nCosta Rica Klasse: I, kg-Preis\n1,29 €',
+    priceText: '1,29 €',
+    sourceUrl: aldi.url
+  }, aldi, config);
+  const looseProduce = looseProduceResult.offer;
+  assert.equal(looseProduceResult.recognized, true);
+  assert.equal(looseProduce.pack, null);
+  assert.equal(looseProduce.planningStatus, 'needs-review');
+  assert.equal(looseProduce.priceBasis, 'weight-based-unit-unknown');
+  assert.equal(looseProduce.fieldStatus.price, 'needs-review');
+
+  const variablePack = assessOffer({
+    name: 'Pesto Genovese',
+    text: 'Pesto Genovese\n190- bzw. 200-g-Glas\n1,69 €',
+    priceText: '1,69 €',
+    packSizeText: '190- bzw. 200-g-Glas',
+    sourceUrl: aldi.url
+  }, aldi, config).offer;
+  assert.equal(variablePack.packSizeValue, null);
+  assert.equal(variablePack.fieldStatus.packSize, 'ambiguous');
+  assert.equal(variablePack.planningStatus, 'needs-review');
+
+  const measuredPack = assessOffer({
+    name: 'Bio-Dinkelmehl',
+    text: 'Bio-Dinkelmehl\n500-g-Packung\n1,25 €',
+    priceText: '1,25 €',
+    packSizeText: '500-g-Packung',
+    sourceUrl: aldi.url
+  }, aldi, config).offer;
+  assert.equal(measuredPack.packSizeValue, 500);
+  assert.equal(measuredPack.planningStatus, 'ready');
 });
 
 test('parsePrice liest deutsche Angebotspreise inklusive Tausenderpunkt', () => {
@@ -609,6 +657,49 @@ test('sichtbare Regelpreise und Packungsbeschreibung werden übernommen', () => 
   assert.equal(offer.offer.planningStatus, 'ready');
 });
 
+test('Lidl ergänzt bekannte Lebensmittelbegriffe nur marktspezifisch', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const raw = { name: 'Nutella', text: 'Nutella\n1,99 €\n450 g', priceText: '1,99 €', packSizeText: '450 g', sourceUrl: lidl.url };
+  const lidlResult = assessOffer(raw, lidl, mergeConfig());
+  const edekaResult = assessOffer(raw, edeka, mergeConfig());
+  const gulasch = assessOffer({
+    name: 'Frisches Gulasch, gemischt',
+    text: 'Frisches Gulasch, gemischt\nVom Schwein und Rind. Je 800 g\n7,49 €',
+    productDescription: 'Vom Schwein und Rind. Je 800 g',
+    priceText: '7,49 €',
+    sourceUrl: lidl.url
+  }, lidl, mergeConfig());
+  assert.equal(lidlResult.classification.label, 'food');
+  assert.equal(edekaResult.classification.label, 'uncertain');
+  assert.equal(gulasch.classification.label, 'food');
+});
+
+test('Lidl leitet fehlende Packungseinheit nur mit explizitem Einheitspreis ab', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const raw = {
+    name: 'Naturelle',
+    text: 'Naturelle\nJe 1,5 zzgl. 0.25 Pfand\n0,79 €',
+    productDescription: 'Je 1,5 zzgl. 0.25 Pfand',
+    priceText: '0,79 €',
+    unitPriceText: 'Preis pro Einheit: 1 l = 0,53 €',
+    sourceUrl: lidl.url
+  };
+  const configWithCategory = { ...mergeConfig(), categoryScopeActive: true };
+  const lidlResult = assessOffer(raw, lidl, configWithCategory, '2026-11-20T07:00:00Z');
+  const otherResult = assessOffer(raw, { ...lidl, key: 'Other-Market', inferPackUnitFromUnitPrice: false }, configWithCategory, '2026-11-20T07:00:00Z');
+  assert.equal(lidlResult.offer.pack, '1,5 l');
+  assert.equal(lidlResult.offer.packSizeValue, 1.5);
+  assert.equal(lidlResult.offer.fieldStatus.packSize, 'inferred');
+  assert.deepEqual(lidlResult.offer.evidence.packaging.inferenceSource, {
+    type: 'unit-price', visibleText: 'Preis pro Einheit: 1 l = 0,53 €', unit: 'l'
+  });
+  assert.equal(otherResult.offer.pack, null);
+  assert.equal(otherResult.offer.evidence.packaging.inferenceSource, null);
+});
+
 test('KaufDA-Detailfelder werden vollständig und semantisch getrennt übernommen', () => {
   const babybel = assessOffer({
     name: 'Mini Babybel',
@@ -669,6 +760,48 @@ test('Lebensmittelklassifikation unterscheidet sicher, unsicher und Nichtlebensm
   assert.notEqual(classifyFood('Toaster').label, 'food');
   assert.notEqual(classifyFood('Wasserkocher').label, 'food');
   assert.notEqual(classifyFood('Kaffeevollautomat').label, 'food');
+});
+
+test('EDEKA-Angebote trennen Schweineschnitzel von Küchentüchern im Kategorie-Feed', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const schnitzel = assessOffer({
+    cardId: 'f9f1b84e-83cc-428a-b41b-10439fd18281',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&page=14&productId=f9f1b84e-83cc-428a-b41b-10439fd18281',
+    name: 'Schnitzel',
+    text: '4,29 € Schnitzel 4,89 € 1 kg = 12,26\naus der Oberschale, vom Schwein 350 g SB-Packung',
+    priceText: '4,29 € statt 4,89 €',
+    productDescription: 'aus der Oberschale, vom Schwein 350 g SB-Packung',
+    packSizeText: '350 g SB-Packung',
+    unitPriceText: '1 kg = 12,26'
+  }, edeka, categoryConfig, '2026-11-28T08:44:50.213Z');
+
+  assert.notEqual(schnitzel.classification.label, 'nonfood');
+  assert.equal(schnitzel.state, 'accepted');
+  assert.equal(schnitzel.offer.price, 4.29);
+  assert.equal(schnitzel.offer.packSizeValue, 350);
+  assert.equal(schnitzel.offer.planningStatus, 'ready');
+});
+
+test('EDEKA-Kategorie-Guard blockiert Küchentücher als Markt-Nichtlebensmittel', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const towels = assessOffer({
+    cardId: '13e9a022-cb1e-4eff-9237-c639f6c01cda',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&page=24&productId=13e9a022-cb1e-4eff-9237-c639f6c01cda',
+    name: 'Sooo stark klassik',
+    text: '1,20 € sparen! 3,99 € Sooo stark klassik 5,19 €\nKüchentücher, Limited design edition, 3-lagig 8 Rollen, 8 x 64 Blatt XXL Packung',
+    priceText: '1,20 € sparen! 3,99 € statt 5,19 €',
+    productDescription: 'Küchentücher, Limited design edition, 3-lagig 8 Rollen, 8 x 64 Blatt XXL Packung',
+    packSizeText: '8 x 64 Blatt XXL Packung'
+  }, edeka, categoryConfig, '2026-11-28T08:44:50.213Z');
+
+  assert.equal(towels.classification.label, 'nonfood');
+  assert.equal(towels.state, 'rejected');
+  assert.equal(towels.offer, undefined);
+  assert.equal(towels.reviewItem.classification.label, 'nonfood');
 });
 
 test('Fixturekarten liefern PWA-kompatible Felder und Status', () => {

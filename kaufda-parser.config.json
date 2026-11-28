@@ -31,6 +31,12 @@
       "key": "Lidl-Zellingen",
       "label": "Lidl Zellingen",
       "store": "Lidl",
+      "inferPackUnitFromUnitPrice": true,
+      "foodTerms": [
+        "avocado", "cannoli", "cappuccino", "eiscreme", "entenbrust",
+        "erdnuss", "garnelen", "gulasch", "hirschbraten", "nutella", "rapsöl",
+        "räucherlachs", "romatomaten", "spitzkohl", "tiramisu", "zucchini"
+      ],
       "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
       "url": "https://www.kaufda.de/search?query=Lidl&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "productGroups": ["food"]
@@ -39,6 +45,7 @@
       "key": "Aldi-Sued-Zellingen",
       "label": "ALDI SÜD Zellingen",
       "store": "ALDI SÜD",
+      "interpretationProfile": "aldi-sued-v1",
       "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
       "url": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "productGroups": ["food"]
@@ -49,7 +56,8 @@
       "store": "EDEKA",
       "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
       "url": "https://www.kaufda.de/search?query=EDEKA&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "productGroups": ["food"]
+      "productGroups": ["food"],
+      "nonFoodTerms": ["Küchentücher"]
     },
     {
       "key": "Netto-Thuengersheim",

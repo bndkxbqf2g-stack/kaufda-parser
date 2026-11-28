@@ -522,7 +522,7 @@ export function parseValidity(value, referenceDate = new Date()) {
   return { validFrom: null, validUntil: null, status: 'unknown', text: text || null };
 }
 
-export function parsePackSize(value) {
+export function parsePackSize(value, { fallbackUnit = null } = {}) {
   const normalized = normalizeText(value);
   if (!normalized) return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
 
@@ -591,7 +591,25 @@ export function parsePackSize(value) {
   }
 
   const text = normalized.match(PACK_RE)?.[0] ?? null;
-  if (!text) return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
+  if (!text) {
+    const normalizedFallbackUnit = String(fallbackUnit ?? '').toLocaleLowerCase('de-DE');
+    const allowedFallbackUnits = new Set(['kg', 'g', 'l', 'ml', 'cl']);
+    const bareQuantity = normalized.match(/\b(?:je|pro)\s*(\d+(?:[,.]\d+)?)\b/i);
+    const itemValue = bareQuantity ? parseGermanNumber(bareQuantity[1]) : null;
+    if (allowedFallbackUnits.has(normalizedFallbackUnit) && Number.isFinite(itemValue) && itemValue > 0 && itemValue <= 1000) {
+      return {
+        text: `${bareQuantity[1]} ${normalizedFallbackUnit}`,
+        value: itemValue,
+        unit: normalizedFallbackUnit,
+        count: null,
+        itemValue,
+        itemUnit: normalizedFallbackUnit,
+        ambiguous: false,
+        variants: []
+      };
+    }
+    return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
+  }
   const match = text.match(/(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)/i);
   const itemValue = match ? parseGermanNumber(match[1]) : null;
   const itemUnit = match ? match[2].replace('.', '').toLocaleLowerCase('de-DE') : null;
@@ -722,8 +740,14 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     productDescription,
     ...lines.filter((line) => PACK_RE.test(line) && !UNIT_PRICE_LINE_RE.test(line))
   ].filter(Boolean).join('\n');
-  const pack = parsePackSize(packEvidenceText || findPackSizeText(raw.text ?? text));
   const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+  const packInput = packEvidenceText || findPackSizeText(raw.text ?? text);
+  const visiblePack = parsePackSize(packInput);
+  const canInferPackUnit = market.inferPackUnitFromUnitPrice === true
+    && !visiblePack.text
+    && ['kg', 'g', 'l', 'ml', 'cl'].includes(unit.unit)
+    && /\b(?:je|pro)\s*\d+(?:[,.]\d+)?\b/i.test(packEvidenceText);
+  const pack = canInferPackUnit ? parsePackSize(packInput, { fallbackUnit: unit.unit }) : visiblePack;
   const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
     loyaltyPrice: null,
@@ -746,9 +770,12 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   // XTRA-Preis erst nach Coupon-/Punkteeinlösung gilt.
   const activationRequired = Boolean(explicitActivation && !(kauflandConditions.loyaltyPrice != null && Number.isFinite(priceDetails.currentPrice)));
   const counterPrice = /(?:bedienungs[- ]?theke|frischetheke|an der theke|thekenware)/i.test(text);
+  const aldiLooseUnitPrice = market.interpretationProfile === 'aldi-sued-v1'
+    && !pack.text
+    && /(?:kg|l)\s*[- ]?preis\b/i.test(text);
   const explicitWeightBasis = /(?:je|pro|\/|€\s*\/\s*)\s*100\s*g\b/i.test(`${text} ${unit.text ?? ''}`)
     || unit.unit === '100 g';
-  const weightUnitUnknown = counterPrice && !explicitWeightBasis && !Number.isFinite(unit.amount);
+  const weightUnitUnknown = (counterPrice || aldiLooseUnitPrice) && !explicitWeightBasis && !Number.isFinite(unit.amount);
   const price = Number.isFinite(priceDetails.currentPrice)
     ? priceDetails.currentPrice
     : Number.isFinite(reportedPrice)
@@ -769,14 +796,28 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const validFrom = raw.validFrom ?? validity.validFrom ?? null;
   const validUntil = raw.validUntil ?? raw.validTo ?? validity.validUntil ?? null;
   const sourceUrl = raw.sourceUrl ?? market.url ?? null;
-  const classification = classifyFood(name ?? '', text, { ...config, includeTerms: market.includeTerms ?? config.includeTerms ?? [] });
+  const classification = classifyFood(name ?? '', text, {
+    ...config,
+    includeTerms: market.includeTerms ?? config.includeTerms ?? [],
+    classification: {
+      ...config.classification,
+      foodTerms: uniqueStrings([
+        ...(Array.isArray(config.classification?.foodTerms) ? config.classification.foodTerms : []),
+        ...(Array.isArray(market.foodTerms) ? market.foodTerms : [])
+      ]),
+      nonFoodTerms: [
+        ...(Array.isArray(config.classification?.nonFoodTerms) ? config.classification.nonFoodTerms : []),
+        ...(Array.isArray(market.nonFoodTerms) ? market.nonFoodTerms : [])
+      ]
+    }
+  });
   const recognized = Boolean(name && Number.isFinite(price));
   const fieldStatus = {
     product: name ? (imageOcrRequired && imageProductStatus !== 'verified' ? 'image-unverified' : 'visible') : 'missing',
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
     price: activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
-    packSize: pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
+    packSize: canInferPackUnit ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
     source: validUrl(sourceUrl) ? 'visible' : 'missing'
@@ -806,6 +847,11 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       count: pack.count,
       itemValue: pack.itemValue,
       itemUnit: pack.itemUnit,
+      inferenceSource: canInferPackUnit ? {
+        type: 'unit-price',
+        visibleText: unit.text,
+        unit: unit.unit
+      } : null,
       status: fieldStatus.packSize
     },
     imageProduct: {
@@ -888,7 +934,10 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   // Für die Rezept- und Einkaufsplanung sind Produkt, aktueller Angebotspreis
   // und Packungs-/Mengenangabe die Pflichtangaben. Grundpreis und Gültigkeit
   // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
-  const packBlocksPlanning = !categoryScopeActive && (!pack.text || pack.value == null || pack.ambiguous);
+  // Die Aldi-Kategorie enthält auch lose Ware und variable Gewichte. Ohne
+  // eindeutig messbare Packungsgröße ist der Preis nicht planungsbereit.
+  const requiresExactPackForPlanning = !categoryScopeActive || market.interpretationProfile === 'aldi-sued-v1';
+  const packBlocksPlanning = requiresExactPackForPlanning && (!pack.text || pack.value == null || pack.ambiguous);
   const planningReady = Boolean(
     name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
     && classification.label !== 'nonfood'
@@ -1847,7 +1896,10 @@ export function validateConfig(configInput) {
     const isKaufland = /kaufland/i.test(`${market.key ?? ''} ${market.store ?? ''} ${market.label ?? ''}`);
     if (!['tiles', 'prospect'].includes(collectionMode)) errors.push(`markets[${index}].collectionMode muss tiles oder prospect sein`);
     if (collectionMode === 'prospect' && !isKaufland) errors.push(`markets[${index}].collectionMode=prospect ist derzeit nur für Kaufland freigegeben`);
-    if (market.interpretationProfile && (!isKaufland || market.interpretationProfile !== 'kaufland-v1')) errors.push(`markets[${index}].interpretationProfile ist nur mit kaufland-v1 auf Kaufland zulässig`);
+    const isAldiSued = market.key === 'Aldi-Sued-Zellingen';
+    const profileAllowed = (market.interpretationProfile === 'kaufland-v1' && isKaufland)
+      || (market.interpretationProfile === 'aldi-sued-v1' && isAldiSued);
+    if (market.interpretationProfile && !profileAllowed) errors.push(`markets[${index}].interpretationProfile ist für diesen Markt nicht zulässig`);
   });
   if (!Number.isInteger(config.scroll.maxPasses) || config.scroll.maxPasses < 1) errors.push('scroll.maxPasses muss positiv sein');
   if (!Number.isInteger(config.scroll.stablePassesAtEnd) || config.scroll.stablePassesAtEnd < 1) errors.push('scroll.stablePassesAtEnd muss positiv sein');
