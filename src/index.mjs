@@ -181,6 +181,16 @@ function termsFound(text, terms = []) {
   });
 }
 
+function exactTermsFound(text, terms = []) {
+  const normalized = normalizeText(text).toLocaleLowerCase('de-DE');
+  const tokens = normalized.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  return uniqueStrings(terms).filter((term) => {
+    const candidate = term.toLocaleLowerCase('de-DE');
+    if (/[^\p{L}\p{N}]/u.test(candidate)) return normalized.includes(candidate);
+    return tokens.includes(candidate);
+  });
+}
+
 export function mergeConfig(input = {}) {
   const classification = input.classification ?? {};
   const browser = input.browser ?? {};
@@ -738,11 +748,16 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const packEvidenceText = [
     raw.packSizeText,
     productDescription,
-    ...lines.filter((line) => PACK_RE.test(line) && !UNIT_PRICE_LINE_RE.test(line))
+    ...lines.filter((line) => (PACK_RE.test(line)
+      || (market.normalizeLiterPackUnit === true && /\b\d+(?:[,.]\d+)?\s*liter\b/i.test(line)))
+      && !UNIT_PRICE_LINE_RE.test(line))
   ].filter(Boolean).join('\n');
   const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
   const packInput = packEvidenceText || findPackSizeText(raw.text ?? text);
-  const visiblePack = parsePackSize(packInput);
+  const normalizedPackInput = market.normalizeLiterPackUnit === true
+    ? packInput.replace(/\bliter\b/gi, 'l')
+    : packInput;
+  const visiblePack = parsePackSize(normalizedPackInput);
   const canInferPackUnit = market.inferPackUnitFromUnitPrice === true
     && !visiblePack.text
     && ['kg', 'g', 'l', 'ml', 'cl'].includes(unit.unit)
@@ -750,10 +765,15 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const canInferSinglePiece = market.inferPackFromJeStueck === true
     && !visiblePack.text
     && /\bje\s+stück\b/i.test(packEvidenceText);
+  const canInferBarePiece = market.inferPackFromBareStueck === true
+    && !visiblePack.text
+    && /\bstück\b/i.test(packEvidenceText);
   const pack = canInferPackUnit
-    ? parsePackSize(packInput, { fallbackUnit: unit.unit })
+    ? parsePackSize(normalizedPackInput, { fallbackUnit: unit.unit })
     : canInferSinglePiece
       ? parsePackSize('1 Stück')
+      : canInferBarePiece
+        ? parsePackSize('1 Stück')
       : visiblePack;
   const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
@@ -803,8 +823,28 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const validFrom = raw.validFrom ?? validity.validFrom ?? null;
   const validUntil = raw.validUntil ?? raw.validTo ?? validity.validUntil ?? null;
   const sourceUrl = raw.sourceUrl ?? market.url ?? null;
-  const classification = classifyFood(name ?? '', text, {
+  const productNonFoodMatches = exactTermsFound(name ?? '', market.nonFoodProductTerms ?? []);
+  const alcoholStrengthEvidence = market.rejectExplicitAlcoholEvidence === true
+    && /\b\d{1,2}(?:[,.]\d)?\s*%\s*vol\b\.?/i.test(text)
+    && /\b\d+(?:[,.]\d+)?\s*(?:liter|l)\s*(?:flasche|dose|kasten)\b/i.test(text);
+  const marketNonFoodOverrideMatches = [
+    ...productNonFoodMatches,
+    ...(alcoholStrengthEvidence ? ['Alkoholangabe mit Volumenmaß und Verkaufsgebinde'] : [])
+  ];
+  const classification = marketNonFoodOverrideMatches.length
+    ? {
+      label: 'nonfood',
+      confidence: 'high',
+      reasons: [`Eindeutiges Nichtlebensmittelmerkmal: ${marketNonFoodOverrideMatches[0]}`],
+      matches: marketNonFoodOverrideMatches
+    }
+    : classifyFood(name ?? '', text, {
     ...config,
+    excludeTerms: uniqueStrings([
+      ...(config.excludeTerms ?? []).filter((term) => !(market.excludeTermsToIgnore ?? [])
+        .some((ignored) => String(ignored).toLocaleLowerCase('de-DE') === String(term).toLocaleLowerCase('de-DE'))),
+      ...(Array.isArray(market.excludeTerms) ? market.excludeTerms : [])
+    ]),
     includeTerms: market.includeTerms ?? config.includeTerms ?? [],
     classification: {
       ...config.classification,
@@ -824,7 +864,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
     price: activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
-    packSize: canInferPackUnit || canInferSinglePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
+    packSize: canInferPackUnit || canInferSinglePiece || canInferBarePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
     source: validUrl(sourceUrl) ? 'visible' : 'missing'
@@ -861,6 +901,10 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       } : canInferSinglePiece ? {
         type: 'visible-unit',
         visibleText: packEvidenceText.match(/\bje\s+stück\b/i)?.[0] ?? null,
+        unit: 'stück'
+      } : canInferBarePiece ? {
+        type: 'visible-unit',
+        visibleText: packEvidenceText.match(/\bstück\b/i)?.[0] ?? null,
         unit: 'stück'
       } : null,
       status: fieldStatus.packSize
@@ -951,8 +995,10 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     || market.interpretationProfile === 'aldi-sued-v1'
     || market.requirePackForPlanning === true;
   const packBlocksPlanning = requiresExactPackForPlanning && (!pack.text || pack.value == null || pack.ambiguous);
+  const foodConfidenceBlocksPlanning = market.requireFoodConfidenceForPlanning === true
+    && (classification.label !== 'food' || classification.confidence !== 'high');
   const planningReady = Boolean(
-    name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
+    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
     && classification.label !== 'nonfood'
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
