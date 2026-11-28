@@ -176,8 +176,8 @@ function termsFound(text, terms = []) {
     const candidate = term.toLocaleLowerCase('de-DE');
     if (candidate.includes(' ') || candidate.includes('-')) return lowered.includes(candidate);
     return tokens.some((token) => token === candidate
-      || ((candidate.length > 3 || candidate === 'tee') && token.length - candidate.length >= 2
-        && (token.startsWith(candidate) || token.endsWith(candidate))));
+      || ((candidate.length > 3 || candidate === 'tee') && token.length - candidate.length >= 3
+        && (token.startsWith(candidate) || (token.endsWith(candidate) && !(candidate === 'wein' && token === 'schwein')))));
   });
 }
 
@@ -831,7 +831,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
   if (activationRequired) reasons.push('Rabatt erfordert eine Aktivierung; der Preis ist nicht ohne Weiteres verfügbar.');
   if (weightUnitUnknown) reasons.push('Gewichtsabhängiger Thekenpreis ohne erkennbare Bezugsmenge.');
-  if (recognized && !categoryScopeActive && classification.label === 'nonfood') {
+  if (recognized && classification.label === 'nonfood') {
     state = 'rejected';
     reasons.push(...classification.reasons);
   } else if (recognized && !categoryScopeActive && classification.label === 'uncertain') {
@@ -888,6 +888,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const packBlocksPlanning = !categoryScopeActive && (!pack.text || pack.value == null || pack.ambiguous);
   const planningReady = Boolean(
     name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
+    && classification.label !== 'nonfood'
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
   );

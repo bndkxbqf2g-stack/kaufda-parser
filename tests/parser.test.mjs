@@ -629,6 +629,9 @@ test('Packung und Angebotspreis reichen für die Rezeptplanung ohne Grundpreis o
 
 test('Lebensmittelklassifikation unterscheidet sicher, unsicher und Nichtlebensmittel', () => {
   assert.equal(classifyFood('Salami').label, 'food');
+  assert.equal(classifyFood('Schwein').label, 'uncertain');
+  assert.equal(classifyFood('Rotwein').label, 'nonfood');
+  assert.equal(classifyFood('Schweinefleisch').label, 'food');
   assert.equal(classifyFood('Premium Sojasauce', 'kg-Preis 19.80').matches.includes('reis'), false);
   assert.equal(classifyFood('Premium Sojasauce', 'kg-Preis 19.80').matches.includes('eis'), false);
   assert.equal(classifyFood('Duftkerze Scandinavian Forest').label, 'nonfood');
@@ -769,14 +772,28 @@ test('Prospektseitenzahl blockiert keinen nachweislich ausgeschöpften Kachelfee
   assert.equal(document.summary.planningCompletenessStatus, 'complete');
 });
 
-test('Kategorieumfang darf klassifikatorisch unsichere Karten veröffentlichen', () => {
+test('Kategorieumfang lässt unsichere Karten zu, blockiert aber klare Nichtlebensmittel', () => {
   const scoped = assessOffer({
     cardId: 'category-nonfood-looking-card',
-    name: 'Duftkerze Scandinavian Forest',
+    name: 'Herzerwärmer',
     priceText: '4,99 €',
     packSizeText: '1 Stück',
     sourceUrl: 'https://www.kaufda.de/angebote/category-nonfood-looking-card'
   }, market, mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' }), fixture.capturedAt);
+  assert.equal(scoped.state, 'accepted');
+  assert.equal(scoped.offer.classification.label, 'uncertain');
+
+  const nonfood = assessOffer({
+    cardId: 'category-clear-nonfood-card',
+    name: 'Duftkerze Scandinavian Forest',
+    priceText: '4,99 €',
+    packSizeText: '1 Stück',
+    sourceUrl: 'https://www.kaufda.de/angebote/category-clear-nonfood-card'
+  }, market, mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' }), fixture.capturedAt);
+  assert.equal(nonfood.state, 'rejected');
+  assert.equal(nonfood.offer, undefined);
+  assert.equal(nonfood.reviewItem.classification.label, 'nonfood');
+
   const offer = { ...scoped.offer, marketLocationStatus: 'matched' };
   const result = {
     market: 'Lidl Zellingen',
