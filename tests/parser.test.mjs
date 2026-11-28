@@ -866,6 +866,73 @@ test('Lidl-Kategorieangebote ohne eindeutige Packung bleiben sichtbar, aber revi
   assert.equal(otherMarket.offer.planningStatus, 'needs-review');
 });
 
+test('Lidl-Alternativgrößen 200/300 g und 185/195 g bleiben review-only', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const categoryConfig = { ...mergeConfig(), categoryScopeActive: true };
+  const cases = [
+    {
+      raw: {
+        name: 'Weichkäse',
+        text: '3,33 € Weichkäse 1 kg = 11.10 Gekühlt. Standardpackung: 200 g 300 g 3,33 € Preis pro Einheit: 1 kg = 11.10 Gültig bis 28.11',
+        productDescription: 'Gekühlt. Standardpackung: 200 g 300 g',
+        priceText: '3,33 €',
+        unitPriceText: 'Preis pro Einheit: 1 kg = 11.10',
+        sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=33&locality=Zellingen&productId=9f3657de-b7e9-45f9-a8d9-ac4d1cabf9c8',
+        sourceId: '9f3657de-b7e9-45f9-a8d9-ac4d1cabf9c8'
+      },
+      visibleDescription: 'Gekühlt. Standardpackung: 200 g 300 g',
+      pack: '200/300 g'
+    },
+    {
+      raw: {
+        name: 'Thunfisch Filets in eigenem Saft',
+        text: '0,30 € sparen! 0,99 € Thunfisch Filets in eigenem Saft 1,29 € 1 kg = 5.35/6.60 Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g 0,30 € sparen! 0,99 € 1,29 € Preis pro Einheit: 1 kg = 5.35/6.60 Gültig bis 28.11',
+        productDescription: 'Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g',
+        priceText: '0,30 € sparen! 0,99 € 1,29 €',
+        unitPriceText: 'Preis pro Einheit: 1 kg = 5.35/6.60',
+        sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=33&locality=Zellingen&productId=89a79e9b-c583-4e50-9e29-741a9676a78c',
+        sourceId: '89a79e9b-c583-4e50-9e29-741a9676a78c'
+      },
+      visibleDescription: 'Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g',
+      pack: '185/195 g'
+    }
+  ];
+
+  for (const { raw, visibleDescription, pack: expectedPack } of cases) {
+    const result = assessOffer(raw, lidl, categoryConfig, '2026-11-28T11:22:24.147Z');
+    assert.equal(result.state, 'accepted');
+    assert.equal(result.offer.pack, expectedPack, raw.name);
+    assert.equal(result.offer.packSizeValue, null, raw.name);
+    assert.equal(result.offer.packSizeUnit, 'g', raw.name);
+    assert.equal(result.offer.fieldStatus.packSize, 'ambiguous', raw.name);
+    assert.equal(result.offer.evidence.packaging.visibleText, visibleDescription, raw.name);
+    assert.equal(result.offer.planningStatus, 'needs-review', raw.name);
+    assert.equal(result.offer.status, 'needs-review', raw.name);
+  }
+
+  const nonLidl = assessOffer(cases[1].raw, { ...lidl, key: 'Other-Market', store: 'Other' }, categoryConfig);
+  assert.equal(nonLidl.offer.pack, '195 g');
+  assert.equal(nonLidl.offer.planningStatus, 'ready');
+
+  const repeatedSize = assessOffer({
+    name: 'Weichkäse', text: 'Weichkäse\nStandardpackung: 200 g 200 g\n3,33 €',
+    productDescription: 'Standardpackung: 200 g 200 g', priceText: '3,33 €', sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  assert.equal(repeatedSize.offer.pack, '200 g');
+  assert.equal(repeatedSize.offer.fieldStatus.packSize, 'visible');
+  assert.equal(repeatedSize.offer.planningStatus, 'ready');
+
+  const laterDescriptionSize = assessOffer({
+    name: 'Weichkäse', text: 'Weichkäse\nStandardpackung: 200 g. Hinweis: 300 g gibt es in einer anderen Variante.\n3,33 €',
+    productDescription: 'Standardpackung: 200 g. Hinweis: 300 g gibt es in einer anderen Variante.',
+    priceText: '3,33 €', sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  assert.equal(laterDescriptionSize.offer.pack, '200 g');
+  assert.equal(laterDescriptionSize.offer.fieldStatus.packSize, 'visible');
+  assert.equal(laterDescriptionSize.offer.planningStatus, 'ready');
+});
+
 test('KaufDA-Detailfelder werden vollständig und semantisch getrennt übernommen', () => {
   const babybel = assessOffer({
     name: 'Mini Babybel',

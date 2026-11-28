@@ -644,6 +644,56 @@ export function parsePackSize(value, { fallbackUnit = null } = {}) {
   };
 }
 
+function parseLidlAlternativePackSize(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  const slashAlternative = normalized.match(/\b(\d+(?:[,.]\d+)?)\s*(?:(kg|g|l|ml|cl|stück|stk\.?)\s*)?\/\s*(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|cl|stück|stk\.?)\b/i);
+  if (slashAlternative) {
+    const unit = (slashAlternative[4] ?? slashAlternative[2] ?? '').replace('.', '').toLocaleLowerCase('de-DE');
+    const leftUnit = slashAlternative[2]?.replace('.', '').toLocaleLowerCase('de-DE');
+    const rightUnit = slashAlternative[4]?.replace('.', '').toLocaleLowerCase('de-DE');
+    const variants = [slashAlternative[1], slashAlternative[3]].map(parseGermanNumber);
+    if (unit && (!leftUnit || leftUnit === unit) && (!rightUnit || rightUnit === unit) && variants.every(Number.isFinite)) {
+      return {
+        text: `${slashAlternative[1]}/${slashAlternative[3]} ${unit}`,
+        value: null,
+        unit,
+        count: null,
+        itemValue: null,
+        itemUnit: unit,
+        ambiguous: true,
+        variants
+      };
+    }
+  }
+
+  const standardPack = normalized.match(/\bstandardpackung\s*:?\s*((?:\d+(?:[,.]\d+)?\s*(?:kg|g|l|ml|cl|stück|stk\.?)\s+)+\d+(?:[,.]\d+)?\s*(?:kg|g|l|ml|cl|stück|stk\.?)\b)/i)?.[1];
+  if (standardPack) {
+    const quantities = [...standardPack.matchAll(/(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|cl|stück|stk\.?)\b/gi)];
+    const units = [...new Set(quantities.map((match) => match[2].replace('.', '').toLocaleLowerCase('de-DE')))];
+    const values = [...new Set(quantities.map((match) => parseGermanNumber(match[1])))];
+    if (quantities.length > 1 && units.length === 1 && values.length > 1) {
+      const unit = units[0];
+      const variants = values;
+      if (variants.every(Number.isFinite)) {
+        return {
+          text: `${quantities.map((match) => match[1]).join('/')} ${unit}`,
+          value: null,
+          unit,
+          count: null,
+          itemValue: null,
+          itemUnit: unit,
+          ambiguous: true,
+          variants
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export function parseUnitPrice(value) {
   const text = normalizeText(value);
   const perHundred = text.match(/(?:je|pro)\s+100\s*(g|ml)\s*(?:=|:)??\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/i);
@@ -767,15 +817,19 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     ? packInput.replace(/\bliter\b/gi, 'l')
     : packInput;
   const visiblePack = parsePackSize(normalizedPackInput);
+  const lidlPackAlternatives = market.key === 'Lidl-Zellingen'
+    ? parseLidlAlternativePackSize(normalizedPackInput)
+    : null;
+  const effectiveVisiblePack = lidlPackAlternatives ?? visiblePack;
   const canInferPackUnit = market.inferPackUnitFromUnitPrice === true
-    && !visiblePack.text
+    && !effectiveVisiblePack.text
     && ['kg', 'g', 'l', 'ml', 'cl'].includes(unit.unit)
     && /\b(?:je|pro)\s*\d+(?:[,.]\d+)?\b/i.test(packEvidenceText);
   const canInferSinglePiece = market.inferPackFromJeStueck === true
-    && !visiblePack.text
+    && !effectiveVisiblePack.text
     && /\bje\s+stück\b/i.test(packEvidenceText);
   const canInferBarePiece = market.inferPackFromBareStueck === true
-    && !visiblePack.text
+    && !effectiveVisiblePack.text
     && /\bstück\b/i.test(packEvidenceText);
   const pack = canInferPackUnit
     ? parsePackSize(normalizedPackInput, { fallbackUnit: unit.unit })
@@ -783,7 +837,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       ? parsePackSize('1 Stück')
       : canInferBarePiece
         ? parsePackSize('1 Stück')
-      : visiblePack;
+      : effectiveVisiblePack;
   const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
     loyaltyPrice: null,
