@@ -1375,7 +1375,10 @@ async function readKaufdaDetailSnapshot(page, sourceUrl, detailConfig) {
       const unitPriceLine = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
       const priceHeading = [...document.querySelectorAll('div.text-lg.font-bold')]
         .find((element) => /^preisdetails$/i.test(element.innerText.trim()));
-      const priceBlocks = [...(priceHeading?.nextElementSibling?.children ?? [])]
+      // The title sits inside the accordion header; the price rows are in the
+      // sibling of that header, not in a sibling of the title itself.
+      const priceAccordion = priceHeading?.parentElement?.nextElementSibling;
+      const priceBlocks = [...(priceAccordion?.children ?? [])]
         .filter((block) => block.getBoundingClientRect().height > 0)
         .map((block) => {
           const [row, ...context] = [...block.children];
