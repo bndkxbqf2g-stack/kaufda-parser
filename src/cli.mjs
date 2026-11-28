@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
 import { parseCliArgs } from './cli-args.mjs';
-import { loadConfig, mergeConfig, mergeMarketDocuments, runParser, validateConfig, validateOutputDocument } from './index.mjs';
+import { loadConfig, mergeConfig, mergeMarketDocuments, runParser, validateConfig, validateFullOutputDocument, validateOutputDocument } from './index.mjs';
 
 function help() {
   console.log(`kaufda-parser ${'0.2.0'}
@@ -118,9 +120,23 @@ async function main() {
     return;
   }
   if (command === 'verify') {
+    if (!check.valid) throw new Error(check.errors.join('; '));
     const inputPath = options.input ?? path.join(config.output.directory, config.output.file);
     const document = JSON.parse(await fs.readFile(inputPath, 'utf8'));
-    const result = validateOutputDocument(document, { allowEmptyOffers: Boolean(options['allow-empty']) });
+    const schema = JSON.parse(await fs.readFile(new URL('../schemas/vorratskompass-offers-v1.schema.json', import.meta.url), 'utf8'));
+    const ajv = new Ajv2020({ allErrors: true, strict: false });
+    addFormats(ajv);
+    const validateSchema = ajv.compile(schema);
+    if (!validateSchema(document)) {
+      for (const error of validateSchema.errors) {
+        console.error(`Schema ${error.instancePath || '/'}: ${error.message}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
+    const result = options['allow-empty']
+      ? validateOutputDocument(document, { allowEmptyOffers: true })
+      : validateFullOutputDocument(document, config);
     result.warnings.forEach((warning) => console.warn(`Warnung: ${warning}`));
     if (!result.valid) {
       console.error(result.errors.join('\n'));
@@ -128,7 +144,8 @@ async function main() {
       return;
     }
     const label = document.summary.offerScope === 'selected-category' ? 'Kategorieangebote' : 'Lebensmittelangebote';
-    console.log(`Angebotsdatei veröffentlichbar: ${document.summary.foodOfferCount} ${label}.`);
+    const scope = options['allow-empty'] ? 'Marktdatei geprüft' : 'Gesamtfeed geprüft';
+    console.log(`${scope}: ${document.summary.foodOfferCount} ${label}.`);
     return;
   }
   if (command === 'merge') {
