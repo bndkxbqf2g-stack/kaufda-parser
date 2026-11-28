@@ -79,16 +79,22 @@ test('Playwright-Lauf bleibt im einheitlichen KaufDA-Kartenlayout', () => {
   assert.equal(overridden.hasTouch, false);
 });
 
-test('Kaufland verwendet Prospektseiten; Netto bleibt im Kachelmodus', () => {
+test('Kaufland und Netto verwenden sichtbare Angebotskacheln; Prospektdiagnose bleibt zulässig', () => {
   const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
   const kaufland = config.markets.find((candidate) => candidate.key === 'Kaufland-Wuerzburg');
   const netto = config.markets.find((candidate) => candidate.key === 'Netto-Thuengersheim');
   const aldi = config.markets.find((candidate) => candidate.key === 'Aldi-Sued-Zellingen');
-  assert.equal(kaufland.collectionMode, 'prospect');
+  assert.equal(kaufland.collectionMode, 'tiles');
   assert.equal(kaufland.interpretationProfile, 'kaufland-v1');
+  assert.equal(kaufland.browser, undefined);
+  assert.deepEqual(buildBrowserContextOptions(config, kaufland).viewport, { width: 870, height: 675 });
+  assert.equal(kaufland.requirePackForPlanning, true);
+  assert.equal(kaufland.requireFoodConfidenceForPlanning, true);
   assert.equal(netto.collectionMode ?? 'tiles', 'tiles');
   assert.equal(aldi.interpretationProfile, 'aldi-sued-v1');
   assert.equal(validateConfig(config).valid, true);
+  const prospectDiagnostic = validateConfig({ ...config, markets: config.markets.map((candidate) => candidate.key === kaufland.key ? { ...candidate, collectionMode: 'prospect' } : candidate) });
+  assert.equal(prospectDiagnostic.valid, true);
   const invalidNettoProfile = validateConfig({ ...config, markets: config.markets.map((candidate) => candidate.key === netto.key ? { ...candidate, collectionMode: 'prospect', interpretationProfile: 'kaufland-v1' } : candidate) });
   assert.equal(invalidNettoProfile.valid, false);
   const invalidAldiProfile = validateConfig({ ...config, markets: config.markets.map((candidate) => candidate.key === 'Lidl-Zellingen' ? { ...candidate, interpretationProfile: 'aldi-sued-v1' } : candidate) });
@@ -577,6 +583,51 @@ test('Kaufland-Screenshotbelege erhalten Preis, Multipack und getrennte Evidenz'
   assert.equal(milk.evidence.validity.status, 'complete');
   assert.equal(milk.evidence.market.key, 'Kaufland-Wuerzburg');
   assert.equal(milk.evidence.sourcePage, 'https://www.kaufda.de/contentViewer/static/brochure?page=4');
+});
+
+test('Kaufland-Kachelangebote mit mehrdeutiger Packung oder unsicherer Warengruppe bleiben prüfpflichtig', () => {
+  const kaufland = {
+    key: 'Kaufland-Wuerzburg',
+    store: 'Kaufland',
+    interpretationProfile: 'kaufland-v1',
+    requirePackForPlanning: true,
+    requireFoodConfidenceForPlanning: true
+  };
+  const config = mergeConfig({
+    categoryScopeActive: true,
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: true, required: true, blockPlanning: false }
+  });
+
+  // Die historische Kaufland-Karte führte 0,37 €/l aus der Nachbarbeschreibung
+  // mit; ohne eindeutige Packungsgröße darf sie nicht automatisch planbar sein.
+  const bueno = assessOffer({
+    cardId: 'kaufland-bueno-ambiguous-pack',
+    name: 'Bueno Original',
+    text: 'Bueno Original\n0,55 €\nMineralwasser\n0,37 €/l\n117 - 129-g-Packg.',
+    productDescription: 'Mineralwasser',
+    priceText: '0,55 €',
+    packSizeText: '117 - 129-g-Packg.',
+    unitPriceText: '0,37 €/l',
+    sourceUrl: 'https://www.kaufda.de/angebote/kaufland-bueno'
+  }, kaufland, config, fixture.capturedAt);
+  assert.equal(bueno.recognized, true);
+  assert.equal(bueno.offer.price, 0.55);
+  assert.equal(bueno.offer.unitPrice, 0.37);
+  assert.equal(bueno.offer.fieldStatus.packSize, 'ambiguous');
+  assert.equal(bueno.offer.planningStatus, 'needs-review');
+
+  const pork = assessOffer({
+    cardId: 'kaufland-schweinebauch-unclassified',
+    name: 'Schweinebauch',
+    text: 'Schweinebauch\n5,99 €\n500 g',
+    priceText: '5,99 €',
+    packSizeText: '500 g',
+    sourceUrl: 'https://www.kaufda.de/angebote/kaufland-schweinebauch'
+  }, kaufland, config, fixture.capturedAt);
+  assert.equal(pork.offer.fieldStatus.packSize, 'visible');
+  assert.equal(pork.offer.classification.label, 'uncertain');
+  assert.equal(pork.offer.planningStatus, 'needs-review');
 });
 
 test('Kaufland-Prospekt übernimmt keinen Preis aus einem Seitenkopf ohne Kachelpreis', () => {
@@ -1342,6 +1393,7 @@ test('Teilfeed mit komplett ausgefallenem Markt wird nicht veröffentlicht', () 
   const validation = validateOutputDocument(document);
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(' '), /Kaufland Würzburg.*fehlgeschlagen/);
+  assert.match(validation.errors.join(' '), /Einkaufshelfer Redirect/);
 });
 
 test('Gesamtfeed weist einen Kaufland-Lauf ohne erkannte Produktpreise zurück', () => {
