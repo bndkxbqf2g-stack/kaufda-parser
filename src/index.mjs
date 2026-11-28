@@ -373,6 +373,16 @@ function isKauflandMarket(market = {}) {
     || /kaufland/i.test(`${market.key ?? ''} ${market.store ?? ''} ${market.label ?? ''}`);
 }
 
+function chooseLidlCardPriceDetails(detailPrice, cardPriceText) {
+  if (!cardPriceText || !Number.isFinite(detailPrice.currentPrice) || !Number.isFinite(detailPrice.previousPrice)
+      || detailPrice.currentPrice <= detailPrice.previousPrice || !Number.isFinite(detailPrice.discountAmount)) return null;
+  const cardPrice = parsePriceDetails(cardPriceText);
+  if (cardPrice.currentPrice !== detailPrice.previousPrice || cardPrice.previousPrice !== detailPrice.currentPrice
+      || cardPrice.discountAmount !== detailPrice.discountAmount) return null;
+  const difference = Math.round(cardPrice.previousPrice * 100) - Math.round(cardPrice.currentPrice * 100);
+  return difference === Math.round(cardPrice.discountAmount * 100) ? cardPrice : null;
+}
+
 function parseKauflandConditions(value = '') {
   const text = normalizeText(value);
   const xtraPricePatterns = [
@@ -852,9 +862,12 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     : market.collectionMode === 'prospect'
       ? raw.priceText ?? ''
       : raw.priceText || lines.join('\n');
-  const parsedPriceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  const detailPrice = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  const cardPrice = market.key === 'Lidl-Zellingen' ? chooseLidlCardPriceDetails(detailPrice, raw.cardPriceText) : null;
+  const parsedPriceDetails = cardPrice ?? detailPrice;
   const { currentPrice, previousPrice, discountAmount } = parsedPriceDetails;
-  const checkDiscountReconciliation = market.key === 'Edeka-Zellingen' || (kaufland && market.collectionMode === 'tiles');
+  const checkDiscountReconciliation = ['Edeka-Zellingen', 'Lidl-Zellingen'].includes(market.key)
+    || (kaufland && market.collectionMode === 'tiles');
   const priceArithmeticConflict = checkDiscountReconciliation
     && [currentPrice, previousPrice, discountAmount].every(Number.isFinite)
     && Math.round(previousPrice * 100) - Math.round(currentPrice * 100) !== Math.round(discountAmount * 100);
@@ -947,7 +960,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const evidence = {
     visibleText: normalizeText(raw.text ?? text).slice(0, 1200) || null,
     price: {
-      visibleText: normalizeText(raw.priceText ?? '').slice(0, 400) || null,
+      visibleText: normalizeText((cardPrice ? raw.cardPriceText : raw.priceText) ?? '').slice(0, 400) || null,
       currentPrice: Number.isFinite(price) ? price : null,
       previousPrice: priceDetails.previousPrice,
       ...(priceArithmeticConflict ? {
@@ -1381,6 +1394,7 @@ async function enrichCardsFromDetails(page, cards, market, config, fetchedAt) {
           ...raw,
           productDescription: detail.productDescription || raw.productDescription || '',
           priceText: detail.priceText || raw.priceText || '',
+          cardPriceText: raw.priceText,
           priceLabel: detail.priceLabel ?? raw.priceLabel ?? null,
           unitPriceText: detail.unitPriceText || raw.unitPriceText || '',
           validityText: detail.validityText || raw.validityText || '',

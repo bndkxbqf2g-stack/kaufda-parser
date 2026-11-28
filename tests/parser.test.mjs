@@ -986,6 +986,32 @@ test('Lidl-Alternativgrößen 200/300 g und 185/195 g bleiben review-only', () =
   assert.equal(laterDescriptionSize.offer.planningStatus, 'ready');
 });
 
+test('Lidl übernimmt vertauschte Detailpreise nur bei eindeutig passendem Kartenbeleg', () => {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const raw = {
+    name: 'Smoothie',
+    text: '0,60 € sparen! ab 2,29 € Smoothie 2,89 € 1 l = 9.16 Versch. Sorten, Gekühlt. Je 250 ml 0,60 € sparen! 2,89 € 2,29 € Preis pro Einheit: 1 l = 9.16 Gültig bis 28.11',
+    priceText: '0,60 € sparen! 2,89 € 2,29 €',
+    cardPriceText: '0,60 € sparen! ab 2,29 € 2,89 €',
+    unitPriceText: 'Preis pro Einheit: 1 l = 9.16',
+    packSizeText: 'Je 250 ml',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?page=34&productId=d3a592ba-5a31-4c9d-a6b0-cd590f512531'
+  };
+  const capturedAt = '2026-11-28T11:24:09.861Z';
+  const confirmed = assessOffer(raw, market, config, capturedAt).offer;
+  assert.equal(confirmed.price, 2.29);
+  assert.equal(confirmed.previousPrice, 2.89);
+  assert.equal(confirmed.discountAmount, 0.6);
+  assert.equal(confirmed.unitPrice, 9.16);
+  assert.equal(confirmed.evidence.price.visibleText, raw.cardPriceText);
+  assert.equal(confirmed.planningStatus, 'ready');
+
+  const unconfirmed = assessOffer({ ...raw, cardPriceText: '0,60 € sparen! 2,29 € 3,89 €' }, market, config, capturedAt).offer;
+  assert.equal(unconfirmed.previousPrice, null);
+  assert.equal(unconfirmed.fieldStatus.price, 'needs-review');
+  assert.equal(unconfirmed.planningStatus, 'needs-review');
+});
+
 test('KaufDA-Detailfelder werden vollständig und semantisch getrennt übernommen', () => {
   const babybel = assessOffer({
     name: 'Mini Babybel',
