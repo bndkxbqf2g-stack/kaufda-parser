@@ -74,8 +74,8 @@ export async function createImageTextReader(options = {}) {
   const { createWorker } = await import('tesseract.js');
   const worker = await createWorker(options.language ?? 'deu+eng', 1, { logger: () => {} });
   return {
-    async recognize(image) {
-      const result = await worker.recognize(image, {}, { blocks: true });
+    async recognize(image, recognizeOptions = {}) {
+      const result = await worker.recognize(image, recognizeOptions, { blocks: true });
       return extractTesseractLines(result.data).map((line) => ({
         text: normalize(line.text),
         confidence: line.confidence == null || line.confidence === ''

@@ -115,6 +115,17 @@ test('Prospekt-OCR normalisiert Screenshot-Skalierung und ordnet überlappende Z
   assert.equal(region.text, '2,22 €');
 });
 
+test('Prospekt-OCR weist zusammengeführte zeilenbreite OCR-Boxen keiner Produktkachel zu', () => {
+  const [region] = assignOcrLinesToRegions([
+    { text: '2,22 €', confidence: 92, box: { x: 85, y: 40, width: 50, height: 12 } },
+    { text: 'Werbekopf 15€ mehrere Angebote', confidence: 28, box: { x: -280, y: 20, width: 650, height: 24 } }
+  ], [
+    { id: 'kinder-riegel', name: 'Kinder Riegel', x: 0, y: 0, width: 100, height: 80 }
+  ]);
+
+  assert.equal(region.text, '2,22 €');
+});
+
 test('Prospekt-OCR behält Zeilenkonfidenz und trennt Angebotsdaten vom Linklabel', () => {
   const lines = [
     { text: 'KINDER RIEGEL', confidence: 72, box: { x: 20, y: 20, width: 55, height: 12 } },

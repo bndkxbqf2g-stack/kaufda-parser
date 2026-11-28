@@ -453,10 +453,11 @@ export function assignOcrLinesToRegions(lines = [], regions = [], tolerance = 8)
       const intersection = Math.max(0, right - left) * Math.max(0, bottom - top);
       const lineArea = Math.max(1, line.box.width * line.box.height);
       const overlap = intersection / lineArea;
+      const lineFitsRegion = line.box.width <= Math.max(region.width * 1.75, tolerance * 2);
       const centerInside = x >= region.x - tolerance && x <= region.x + region.width + tolerance
         && y >= region.y - tolerance && y <= region.y + region.height + tolerance;
-      return { region, index, overlap, centerInside, area: region.width * region.height };
-    }).filter((candidate) => candidate.centerInside || candidate.overlap >= 0.2)
+      return { region, index, overlap, centerInside, lineFitsRegion, area: region.width * region.height };
+    }).filter((candidate) => candidate.lineFitsRegion && (candidate.centerInside || candidate.overlap >= 0.2))
       .sort((left, right) => right.overlap - left.overlap || left.area - right.area || left.index - right.index);
     const confidence = line.confidence == null || line.confidence === '' ? null : Number(line.confidence);
     candidates[0]?.region.ocrLines.push({
@@ -1415,7 +1416,7 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
           .filter((region) => region.visible && region.name.length >= 2 && region.width * region.height > 1200));
         const screenshot = await page.screenshot({ type: 'png', scale: 'css' });
         const viewport = page.viewportSize();
-        const ocrLines = scaleOcrLinesToViewport(await reader.recognize(screenshot), screenshot, viewport);
+        const ocrLines = scaleOcrLinesToViewport(await reader.recognize(screenshot, { tessedit_pageseg_mode: '11' }), screenshot, viewport);
         const grouped = assignOcrLinesToRegions(ocrLines, regions);
         const assignedLines = grouped.flatMap((region) => region.ocrLines);
         const isPriceLine = (line) => /\d+(?:[,.]\d{1,2})?\s*€/.test(line.text) && !UNIT_PRICE_LINE_RE.test(line.text);
@@ -1448,6 +1449,7 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
           ocrDiagnostics.debugPages.push({
             firstPage: pageNumber,
             lastPage: Math.min(expectedPageCount, pageNumber + 1),
+            pageSegmentationMode: 'sparse-text',
             ocrLines: ocrLines.map((line) => ({
               text: line.text,
               confidence: line.confidence,
