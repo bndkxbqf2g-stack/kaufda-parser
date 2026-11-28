@@ -88,7 +88,21 @@ jobs:
         env:
           MARKET_KEY: ${{ matrix.market }}
           DEBUG_PROSPECT: ${{ needs.select-markets.outputs.debug_prospect }}
-        run: node --input-type=module -e 'import fs from "node:fs"; const d=JSON.parse(fs.readFileSync(`generated/parts/${process.env.MARKET_KEY}.json`, "utf8")); const includeEvidence=process.env.DEBUG_PROSPECT === "true"; console.log(JSON.stringify({summary:d.summary,market:d.markets[0],offers:d.offers.map(offer=>({product:offer.product,price:offer.price,pack:offer.pack,sourcePage:offer.sourcePage,planningStatus:offer.planningStatus,...(includeEvidence?{evidence:offer.evidence,imageProductStatus:offer.fieldStatus?.imageProduct}: {})}))}, null, 2));'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const d = JSON.parse(fs.readFileSync(`generated/parts/${process.env.MARKET_KEY}.json`, 'utf8'));
+          const includeEvidence = process.env.DEBUG_PROSPECT === 'true';
+          const offers = d.offers.map((offer) => ({
+            product: offer.product,
+            price: offer.price,
+            pack: offer.pack,
+            sourcePage: offer.sourcePage,
+            planningStatus: offer.planningStatus,
+            ...(includeEvidence ? { evidence: offer.evidence, imageProductStatus: offer.fieldStatus?.imageProduct } : {})
+          }));
+          console.log(JSON.stringify({ summary: d.summary, market: d.markets[0], offers }, null, 2));
+          NODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: market-${{ matrix.market }}
