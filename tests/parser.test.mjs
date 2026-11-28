@@ -1269,6 +1269,33 @@ test('EDEKA setzt widersprüchliche Sparbeträge nicht als sicheren Vorpreis ein
   assert.equal(consistentDiscount.offer.planningStatus, 'ready');
 });
 
+test('Kaufland-Kacheln behalten widersprüchliche Sparpreise zur Prüfung', () => {
+  const kaufland = {
+    key: 'Kaufland-Wuerzburg',
+    label: 'Kaufland Würzburg',
+    store: 'Kaufland',
+    collectionMode: 'tiles',
+    interpretationProfile: 'kaufland-v1',
+    requirePackForPlanning: true,
+    requireFoodConfidenceForPlanning: true
+  };
+  const categoryConfig = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const result = assessOffer({
+    name: 'Nuss-Nugat-Creme',
+    text: '1,50 € sparen! ab 1,99 € Nuss-Nugat-Creme 3,99 € (1 kg = 3.98) cremig-nussiger Brotaufstrich je 500-g-Glas 1,50 € sparen! 1,99 € 2,49 € 3,99 € Preis pro Einheit: (1 kg = 3.98) Gültig bis 28.11',
+    priceText: '1,50 € sparen! 1,99 € 2,49 € 3,99 €',
+    packSizeText: '500-g-Glas',
+    unitPriceText: 'Preis pro Einheit: (1 kg = 3.98)',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?page=59&productId=2f5e2010-1e0f-467e-ae97-1fd864f2f18d'
+  }, kaufland, categoryConfig, '2026-11-28T11:36:06Z');
+  assert.equal(result.offer.price, 1.99);
+  assert.equal(result.offer.previousPrice, null);
+  assert.equal(result.offer.discountAmount, 1.5);
+  assert.equal(result.offer.unitPrice, 3.98);
+  assert.equal(result.offer.fieldStatus.price, 'needs-review');
+  assert.equal(result.offer.planningStatus, 'needs-review');
+});
+
 test('Fixturekarten liefern PWA-kompatible Felder und Status', () => {
   const result = assessOffer(fixture.cards[0], market, mergeConfig(), fixture.capturedAt);
   assert.equal(result.state, 'accepted');

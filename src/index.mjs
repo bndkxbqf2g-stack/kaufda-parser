@@ -854,7 +854,8 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       : raw.priceText || lines.join('\n');
   const parsedPriceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
   const { currentPrice, previousPrice, discountAmount } = parsedPriceDetails;
-  const priceArithmeticConflict = market.key === 'Edeka-Zellingen'
+  const checkDiscountReconciliation = market.key === 'Edeka-Zellingen' || (kaufland && market.collectionMode === 'tiles');
+  const priceArithmeticConflict = checkDiscountReconciliation
     && [currentPrice, previousPrice, discountAmount].every(Number.isFinite)
     && Math.round(previousPrice * 100) - Math.round(currentPrice * 100) !== Math.round(discountAmount * 100);
   const priceDetails = priceArithmeticConflict
