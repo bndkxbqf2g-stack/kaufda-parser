@@ -2014,8 +2014,10 @@ export function validateOutputDocument(document, { allowEmptyOffers = false } = 
   if (summary.planningCompletenessStatus !== expectedPlanningStatus) errors.push('summary.planningCompletenessStatus stimmt nicht mit offers überein.');
   if (summary.completenessStatus === 'failed') errors.push('Alle Märkte sind fehlgeschlagen.');
   markets.forEach((market, index) => {
-    if (market?.completenessStatus === 'failed' || (Array.isArray(market?.errors) && market.errors.length > 0)) {
-      errors.push(`markets[${index}] (${market.market ?? market.marketKey ?? 'unbekannt'}) ist fehlgeschlagen; ein Teilfeed darf nicht veröffentlicht werden.`);
+    const marketErrors = Array.isArray(market?.errors) ? market.errors : [];
+    if (market?.completenessStatus === 'failed' || marketErrors.length > 0) {
+      const detail = marketErrors.length ? ` ${marketErrors.join(' ')}` : '';
+      errors.push(`markets[${index}] (${market.market ?? market.marketKey ?? 'unbekannt'}) ist fehlgeschlagen; ein Teilfeed darf nicht veröffentlicht werden.${detail}`);
     }
   });
   const marketByKey = new Map(markets.map((market) => [market?.marketKey, market]));

@@ -1393,6 +1393,7 @@ test('Teilfeed mit komplett ausgefallenem Markt wird nicht veröffentlicht', () 
   const validation = validateOutputDocument(document);
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(' '), /Kaufland Würzburg.*fehlgeschlagen/);
+  assert.match(validation.errors.join(' '), /Einkaufshelfer Redirect/);
 });
 
 test('Gesamtfeed weist einen Kaufland-Lauf ohne erkannte Produktpreise zurück', () => {
