@@ -33,6 +33,7 @@ jobs:
       market_keys: ${{ steps.selection.outputs.market_keys }}
       publish: ${{ steps.selection.outputs.publish }}
       debug_prospect: ${{ steps.selection.outputs.debug_prospect }}
+      debug_spread: ${{ steps.selection.outputs.debug_spread }}
     steps:
       - id: selection
         env:
@@ -42,6 +43,7 @@ jobs:
             echo 'market_keys=["Lidl-Zellingen","Aldi-Sued-Zellingen","Edeka-Zellingen","Netto-Thuengersheim","Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
             echo 'publish=true' >> "$GITHUB_OUTPUT"
             echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
+            echo 'debug_spread=' >> "$GITHUB_OUTPUT"
           else
             case "$RUN_SCOPE" in
               lidl) echo 'market_keys=["Lidl-Zellingen"]' >> "$GITHUB_OUTPUT" ;;
@@ -54,8 +56,10 @@ jobs:
             echo 'publish=false' >> "$GITHUB_OUTPUT"
             if [ "$RUN_SCOPE" = "kaufland" ]; then
               echo 'debug_prospect=true' >> "$GITHUB_OUTPUT"
+              echo 'debug_spread=41' >> "$GITHUB_OUTPUT"
             else
               echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
+              echo 'debug_spread=' >> "$GITHUB_OUTPUT"
             fi
           fi
 
@@ -90,10 +94,12 @@ jobs:
         env:
           MARKET_KEY: ${{ matrix.market }}
           DEBUG_PROSPECT: ${{ needs.select-markets.outputs.debug_prospect }}
+          DEBUG_SPREAD: ${{ needs.select-markets.outputs.debug_spread }}
         run: |
           mkdir -p generated/parts
           EXTRA_ARGS=()
           if [ "$DEBUG_PROSPECT" = "true" ]; then EXTRA_ARGS+=(--debug-prospect); fi
+          if [ -n "$DEBUG_SPREAD" ]; then EXTRA_ARGS+=(--debug-spread "$DEBUG_SPREAD"); fi
           node src/cli.mjs parse --config kaufda-parser.config.json --market "$MARKET_KEY" --output "generated/parts/$MARKET_KEY.json" "${EXTRA_ARGS[@]}"
       - name: Marktergebnis prüfen
         env:
@@ -133,6 +139,13 @@ jobs:
           path: generated/parts/${{ matrix.market }}.json
           if-no-files-found: error
           retention-days: 1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: needs.select-markets.outputs.debug_spread != '' && matrix.market == 'Kaufland-Wuerzburg'
+        with:
+          name: kaufland-spread-debug
+          path: generated/parts/debug/kaufland-wuerzburg-spread-41-42.png
+          if-no-files-found: error
+          retention-days: 3
 
   publish:
     needs: [parse-market, select-markets]

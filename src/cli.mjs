@@ -20,6 +20,7 @@ Beispiele:
   node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
   node src/cli.mjs parse --config kaufda-parser.config.json --market Lidl-Zellingen --output generated/parts/Lidl-Zellingen.json
   node src/cli.mjs parse --config kaufda-parser.config.json --market Kaufland-Wuerzburg --debug-prospect --output generated/parts/Kaufland-Wuerzburg.json
+  node src/cli.mjs parse --config kaufda-parser.config.json --market Kaufland-Wuerzburg --debug-prospect --debug-spread 41 --output generated/parts/Kaufland-Wuerzburg.json
   node src/cli.mjs merge --config kaufda-parser.config.json --input-dir generated/parts --output generated/offers.next.json
   node src/cli.mjs verify --input generated/offers.json
   node src/cli.mjs parse --market Aldi-Sued --headed
@@ -151,7 +152,8 @@ async function main() {
     outputPath,
     marketKey: options.market ?? null,
     headed: Boolean(options.headed),
-    debugProspect: Boolean(options['debug-prospect'])
+    debugProspect: Boolean(options['debug-prospect']),
+    debugSpread: options['debug-spread'] == null ? null : options['debug-spread'] === true ? Number.NaN : Number(options['debug-spread'])
   });
   console.log(JSON.stringify(document.summary, null, 2));
   console.log(`Ausgabe: ${outputPath}`);

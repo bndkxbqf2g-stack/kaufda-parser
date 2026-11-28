@@ -1454,7 +1454,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   };
 }
 
-export async function collectProspectOffersFromPage(page, market, configInput = {}, { debugProspect = false } = {}) {
+export async function collectProspectOffersFromPage(page, market, configInput = {}, { debugProspect = false, debugSpread = null, debugScreenshotPath = null } = {}) {
   const config = mergeConfig(configInput);
   const waitMs = Math.max(0, Number(market.prospectPageWaitMs ?? 900));
   const initialText = await page.locator('body').innerText().catch(() => '');
@@ -1528,6 +1528,10 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
           })
           .filter((region) => region.visible && region.name.length >= 2 && region.width * region.height > 1200));
         const screenshot = await page.screenshot({ type: 'png', scale: 'css' });
+        if (debugProspect && pageNumber === debugSpread && debugScreenshotPath) {
+          await fs.mkdir(path.dirname(debugScreenshotPath), { recursive: true });
+          await fs.writeFile(debugScreenshotPath, screenshot);
+        }
         const viewport = page.viewportSize();
         const ocrLines = scaleOcrLinesToViewport(await reader.recognize(screenshot, { tessedit_pageseg_mode: '11' }), screenshot, viewport);
         const grouped = assignOcrLinesToRegions(ocrLines, regions);
@@ -1729,9 +1733,12 @@ export function assertSafeOutputTarget(configInput, outputPath, marketKey = null
   }
 }
 
-export async function runParser(configInput, { outputPath = null, marketKey = null, headed = false, debugProspect = false } = {}) {
+export async function runParser(configInput, { outputPath = null, marketKey = null, headed = false, debugProspect = false, debugSpread = null } = {}) {
   const config = mergeConfig(configInput);
   assertSafeOutputTarget(config, outputPath, marketKey);
+  if (debugSpread != null && (!Number.isInteger(debugSpread) || debugSpread < 1 || debugSpread % 2 === 0)) {
+    throw new Error('--debug-spread muss die ungerade Startseite eines Spreads sein (z. B. 41).');
+  }
   const { chromium } = await import('playwright');
   const browser = await chromium.launch({ headless: !headed });
   const results = [];
@@ -1807,7 +1814,10 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
         let scan;
         if (market.collectionMode === 'prospect') {
           if (!await activateProspectTab()) throw new Error('Kaufland-Prospektansicht war im ausgewählten Markt nicht sichtbar.');
-          scan = await collectProspectOffersFromPage(page, market, config, { debugProspect });
+          const debugScreenshotPath = debugSpread == null
+            ? null
+            : path.resolve('generated', 'parts', 'debug', `${slug(market.key)}-spread-${debugSpread}-${debugSpread + 1}.png`);
+          scan = await collectProspectOffersFromPage(page, market, config, { debugProspect, debugSpread, debugScreenshotPath });
           scan.offerCategory = null;
           scan.offerCategoryStatus = 'not-attempted';
           scan.collectionMode = 'prospect';

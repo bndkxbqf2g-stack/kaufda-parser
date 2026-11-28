@@ -57,6 +57,10 @@ test('CLI erkennt ein alleinstehendes Flag am Argumentende', () => {
     headed: true,
     output: 'offers.json'
   });
+  assert.deepEqual(parseCliArgs(['parse', '--debug-spread', '41']), {
+    _: ['parse'],
+    'debug-spread': '41'
+  });
 });
 
 test('Playwright-Lauf bleibt im einheitlichen KaufDA-Kartenlayout', () => {
@@ -586,6 +590,57 @@ test('Kaufland-Prospekt übernimmt keinen Preis aus einem Seitenkopf ohne Kachel
   assert.equal(result.recognized, false);
   assert.equal(result.price, null);
   assert.equal(result.reviewItem.evidence.price.currentPrice, null);
+});
+
+test('Kaufland-Seite 41–42 ordnet Seitenkopfpreis keiner Kachel zu und erkennt den Rabatt-Link nicht als Angebot', () => {
+  // Read-only Rohspur aus dem veröffentlichten Kaufland-Lauf (Job 140938998316).
+  // Die 22 Rechtecke sind die DOM-Linkregionen des Spreads 41–42.
+  const regions = [
+    ['Cabernet Sauvignon - Link', 11.4375, -131.921875, 147.5625, 172.65625],
+    ['Frizzante Bianco - Link', 319.578125, -131.921875, 129.1875, 172.65625],
+    ['Mouton Cadet Bordeaux AOC - Link', 159.015625, -131.921875, 141.421875, 172.65625],
+    ['London Dry Gin - Link', 471, -131.921875, 149.84375, 176.421875],
+    ['Craft Rum Flavour Spirit - Link', 620.859375, -131.921875, 145.265625, 176.421875],
+    ['Spiced Gold - Link', 787.515625, -131.921875, 120.03125, 176.421875],
+    ['Men Expert Hydra Energy Kühlendes Gel Anti-Glanz - Link', 298.203125, 132.75, 147.5625, 200.171875],
+    ['Deo-Spray - Link', 298.203125, 332.9375, 147.5625, 239.84375],
+    ['Sport Gel Fresh - Link', 298.203125, 572.78125, 147.5625, 230.71875],
+    ['Elvital Shampoo - Link', 6.125, 451.3125, 147.5625, 352.1875],
+    ['Elektrische Zahnbürste Vitality Pro - Link', 153.703125, 502.5, 144.484375, 300.984375],
+    ['Wäscheparfüm - Link', 615.5, 572.03125, 150.625, 229.96875],
+    ['Weichspüler XXL - Link', 467.9375, 572.03125, 147.5625, 229.96875],
+    ['Pure Chicken Bones - Link', 467.9375, 356.609375, 147.5625, 215.40625],
+    ['Taschentücher - Link', 615.5, 378.015625, 150.625, 194],
+    ['Toilettenpapier Soft - Link', 766.140625, 356.609375, 142.984375, 215.40625],
+    ['3€ SOFORT-RABATT - Link', 766.140625, 572.03125, 142.984375, 229.96875],
+    ['Bio-Fruchtchips - Link', 689.65625, 135.828125, 219.421875, 190.984375],
+    ['Kinder-Kostüm - Link', 150.625, 868.8125, 298.203125, 271.953125],
+    ['Singende Puppe Rumi - Link', 471.78125, 877.9375, 146.046875, 203.953125],
+    ['Mini-Figur - Link', 617.78125, 897.078125, 147.5625, 184.875],
+    ['Fun Snaps - Link', 765.359375, 897.078125, 143.765625, 184.875]
+  ].map(([name, x, y, width, height], id) => ({ id: String(id), name, x, y, width, height }));
+  const assigned = assignOcrLinesToRegions([
+    { text: '15€', confidence: 96, box: { x: 1096, y: 115, width: 50, height: 20 } },
+    { text: '3€ SOFORT-RABATT', confidence: 83, box: { x: 775, y: 584, width: 123, height: 9 } }
+  ], regions);
+
+  assert.equal(assigned.length, 22);
+  assert.equal(assigned.filter((region) => region.ocrLines.some((line) => line.text === '15€')).length, 0);
+  assert.deepEqual(assigned.filter((region) => region.ocrLines.some((line) => line.text === '3€ SOFORT-RABATT')).map((region) => region.name), [
+    '3€ SOFORT-RABATT - Link'
+  ]);
+
+  const promoRegion = assigned.find((region) => region.name === '3€ SOFORT-RABATT - Link');
+  const promoName = normalizeProspectProductName(promoRegion.name, { status: 'unverified' });
+  const result = assessOffer({
+    name: promoName,
+    text: promoRegion.text,
+    priceText: promoRegion.text,
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/kaufland-spread-41-42'
+  }, { ...market, key: 'Kaufland-Wuerzburg', store: 'Kaufland', collectionMode: 'prospect' }, mergeConfig(), fixture.capturedAt);
+  assert.equal(result.recognized, false);
+  assert.equal(result.offer, undefined);
+  assert.equal(result.reviewItem.evidence.price.currentPrice, 3);
 });
 
 test('Aktivierungspflicht und unklarer Thekenpreis bleiben prüfpflichtig', () => {
