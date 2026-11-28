@@ -1,6 +1,15 @@
 name: KaufDA-Angebote aktualisieren
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'kaufda-parser.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/kaufda-offers.yml'
   workflow_dispatch:
     inputs:
       scope:
@@ -14,7 +23,7 @@ on:
           - edeka
           - netto
           - kaufland
-        default: kaufland
+        default: all-check
         required: true
   schedule:
     # Täglich 05:15 UTC.
@@ -37,7 +46,7 @@ jobs:
     steps:
       - id: selection
         env:
-          RUN_SCOPE: ${{ inputs.scope || 'kaufland' }}
+          RUN_SCOPE: ${{ inputs.scope || 'all-check' }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$RUN_SCOPE" = "all" ] || [ "$RUN_SCOPE" = "all-check" ]; then
             echo 'market_keys=["Lidl-Zellingen","Aldi-Sued-Zellingen","Edeka-Zellingen","Netto-Thuengersheim","Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
