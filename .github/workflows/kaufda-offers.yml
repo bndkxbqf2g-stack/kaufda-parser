@@ -34,8 +34,6 @@ jobs:
       market_keys: ${{ steps.selection.outputs.market_keys }}
       assemble_feed: ${{ steps.selection.outputs.assemble_feed }}
       publish: ${{ steps.selection.outputs.publish }}
-      debug_prospect: ${{ steps.selection.outputs.debug_prospect }}
-      debug_spread: ${{ steps.selection.outputs.debug_spread }}
     steps:
       - id: selection
         env:
@@ -49,8 +47,6 @@ jobs:
             else
               echo 'publish=false' >> "$GITHUB_OUTPUT"
             fi
-            echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
-            echo 'debug_spread=' >> "$GITHUB_OUTPUT"
           else
             case "$RUN_SCOPE" in
               lidl) echo 'market_keys=["Lidl-Zellingen"]' >> "$GITHUB_OUTPUT" ;;
@@ -62,13 +58,6 @@ jobs:
             esac
             echo 'assemble_feed=false' >> "$GITHUB_OUTPUT"
             echo 'publish=false' >> "$GITHUB_OUTPUT"
-            if [ "$RUN_SCOPE" = "kaufland" ]; then
-              echo 'debug_prospect=true' >> "$GITHUB_OUTPUT"
-              echo 'debug_spread=41' >> "$GITHUB_OUTPUT"
-            else
-              echo 'debug_prospect=false' >> "$GITHUB_OUTPUT"
-              echo 'debug_spread=' >> "$GITHUB_OUTPUT"
-            fi
           fi
 
   test-and-validate:
@@ -101,14 +90,9 @@ jobs:
       - name: Markt erfassen
         env:
           MARKET_KEY: ${{ matrix.market }}
-          DEBUG_PROSPECT: ${{ needs.select-markets.outputs.debug_prospect }}
-          DEBUG_SPREAD: ${{ needs.select-markets.outputs.debug_spread }}
         run: |
           mkdir -p generated/parts
-          EXTRA_ARGS=()
-          if [ "$DEBUG_PROSPECT" = "true" ]; then EXTRA_ARGS+=(--debug-prospect); fi
-          if [ -n "$DEBUG_SPREAD" ]; then EXTRA_ARGS+=(--debug-spread "$DEBUG_SPREAD"); fi
-          node src/cli.mjs parse --config kaufda-parser.config.json --market "$MARKET_KEY" --output "generated/parts/$MARKET_KEY.json" "${EXTRA_ARGS[@]}"
+          node src/cli.mjs parse --config kaufda-parser.config.json --market "$MARKET_KEY" --output "generated/parts/$MARKET_KEY.json"
       - name: Marktergebnis prüfen
         env:
           MARKET_KEY: ${{ matrix.market }}
@@ -116,30 +100,18 @@ jobs:
       - name: Marktstatus ausgeben
         env:
           MARKET_KEY: ${{ matrix.market }}
-          DEBUG_PROSPECT: ${{ needs.select-markets.outputs.debug_prospect }}
         run: |
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const d = JSON.parse(fs.readFileSync(`generated/parts/${process.env.MARKET_KEY}.json`, 'utf8'));
-          const includeEvidence = process.env.DEBUG_PROSPECT === 'true';
           const offers = d.offers.map((offer) => ({
             product: offer.product,
             price: offer.price,
             pack: offer.pack,
             sourcePage: offer.sourcePage,
-            planningStatus: offer.planningStatus,
-            ...(includeEvidence ? { evidence: offer.evidence, imageProductStatus: offer.fieldStatus?.imageProduct } : {})
+            planningStatus: offer.planningStatus
           }));
-          const reviewItems = includeEvidence ? d.reviewItems.map((item) => ({
-            name: item.name,
-            productDescription: item.productDescription,
-            price: item.price,
-            packSize: item.packSize,
-            state: item.state,
-            reasons: item.reasons,
-            evidence: item.evidence
-          })) : undefined;
-          console.log(JSON.stringify({ summary: d.summary, market: d.markets[0], offers, reviewItems }, null, 2));
+          console.log(JSON.stringify({ summary: d.summary, market: d.markets[0], offers }, null, 2));
           NODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -147,13 +119,6 @@ jobs:
           path: generated/parts/${{ matrix.market }}.json
           if-no-files-found: error
           retention-days: 1
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.select-markets.outputs.debug_spread != '' && matrix.market == 'Kaufland-Wuerzburg'
-        with:
-          name: kaufland-spread-debug
-          path: generated/parts/debug/kaufland-wuerzburg-spread-41-42.png
-          if-no-files-found: error
-          retention-days: 3
 
   verify-feed:
     needs: [parse-market, select-markets]

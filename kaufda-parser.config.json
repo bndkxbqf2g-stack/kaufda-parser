@@ -84,12 +84,13 @@
       "key": "Kaufland-Wuerzburg",
       "label": "Kaufland Würzburg",
       "store": "Kaufland",
-      "collectionMode": "prospect",
+      "collectionMode": "tiles",
       "interpretationProfile": "kaufland-v1",
-      "browser": { "viewport": { "width": 1180, "height": 920 } },
       "location": { "city": "Würzburg" },
       "url": "https://www.kaufda.de/search?query=Kaufland&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "productGroups": ["food"],
+      "requirePackForPlanning": true,
+      "requireFoodConfidenceForPlanning": true,
       "sourceNote": "Bezugsquelle für die sichtbare Kaufland-Filiale im Würzburger Raum; Distanz und Adresse bleiben Laufdaten."
     }
   ],
