@@ -475,6 +475,21 @@ test('Kaufland-Screenshotbelege erhalten Preis, Multipack und getrennte Evidenz'
   assert.equal(milk.evidence.sourcePage, 'https://www.kaufda.de/contentViewer/static/brochure?page=4');
 });
 
+test('Kaufland-Prospekt übernimmt keinen Preis aus einem Seitenkopf ohne Kachelpreis', () => {
+  const result = assessOffer({
+    cardId: 'kaufland-empty-price-tile',
+    name: 'Pommersche Gutsleberwurst',
+    text: 'Pommersche Gutsleberwurst - Link\nKaufland NIVEA 15€',
+    priceText: '',
+    validityText: 'Kaufland NIVEA 15€',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/kaufland-empty-price-tile'
+  }, { ...market, key: 'Kaufland-Wuerzburg', store: 'Kaufland', collectionMode: 'prospect' }, mergeConfig(), fixture.capturedAt);
+
+  assert.equal(result.recognized, false);
+  assert.equal(result.price, null);
+  assert.equal(result.reviewItem.evidence.price.currentPrice, null);
+});
+
 test('Aktivierungspflicht und unklarer Thekenpreis bleiben prüfpflichtig', () => {
   const config = mergeConfig({
     categoryScopeActive: true,

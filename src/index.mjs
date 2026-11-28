@@ -737,7 +737,9 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   };
   const priceTextForParsing = kaufland && kauflandConditions.loyaltyPriceText
     ? text.replace(kauflandConditions.loyaltyPriceText, ' ')
-    : raw.priceText || lines.join('\n');
+    : market.collectionMode === 'prospect'
+      ? raw.priceText ?? ''
+      : raw.priceText || lines.join('\n');
   const priceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
   const explicitActivation = raw.activationRequired ?? (/(?:gutschein|coupon|rabatt)/i.test(text) && /(?:aktivieren|aktivierung erforderlich)/i.test(text));
   // Ein sichtbarer Standardpreis bleibt verwendbar, wenn nur der zusätzliche
