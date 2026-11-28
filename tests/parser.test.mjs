@@ -11,6 +11,7 @@ import {
   buildOffersDocument,
   classifyFood,
   dedupeOffers,
+  extractKauflandGridCards,
   extractPriceText,
   isLikelyFood,
   kaufdaPageFailure,
@@ -39,6 +40,8 @@ import { parseCliArgs } from '../src/cli-args.mjs';
 
 const fixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-visible-cards.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+const kauflandGridFixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-kaufland-offer-grid.json');
+const kauflandGridFixture = JSON.parse(readFileSync(kauflandGridFixturePath, 'utf8'));
 const market = {
   key: 'Lidl-Zellingen',
   label: 'Lidl Zellingen',
@@ -112,6 +115,42 @@ test('Kaufland und Netto verwenden sichtbare Angebotskacheln; Prospektdiagnose b
   assert.deepEqual(parsePriceDetails('Gratis für mindestens 10 Euro Einkauf'), {
     currentPrice: null, previousPrice: null, discountAmount: null, type: 'missing', text: 'Gratis'
   });
+});
+
+test('Kaufland erfasst eindeutige Direktlinks aus dem Angebotsraster statt Navigation und Nachbarcontainer', () => {
+  const nutellaRecord = kauflandGridFixture.records[1];
+  const duplicateNutella = {
+    ...nutellaRecord,
+    text: `${nutellaRecord.text}\n0,10 € sparen!\n5,00 € Nachbarprodukt 500-g-Packung`
+  };
+  const cards = extractKauflandGridCards([...kauflandGridFixture.records, duplicateNutella]);
+
+  assert.equal(cards.length, 4);
+  assert.deepEqual(cards.map((card) => card.cardId), [
+    '1098a84f-8ce9-4172-9b3c-65743b9c5799',
+    '2f5e2010-1e0f-467e-ae97-1fd864f2f18d',
+    '8f231b07-9f19-41be-8550-6f569ae0abcf',
+    '9cbd6ba9-d653-4deb-9b7e-6026bb53692e'
+  ]);
+  assert.equal(cards[0].name, 'Bueno Original');
+  assert.equal(cards[0].priceText, 'ab 0,55 € 1,35 €');
+  assert.equal(cards[0].unitPriceText, '(1 l = 0.37)');
+  assert.equal(cards[0].packSizeText, '');
+  assert.equal(cards[1].sourceUrl, nutellaRecord.sourceUrl);
+  assert.equal(cards[1].priceText, '1,50 € sparen! ab 1,99 € 3,99 €');
+  assert.equal(cards[1].unitPriceText, '(1 kg = 3.98)');
+  assert.equal(cards[1].packSizeText, '');
+  assert.doesNotMatch(cards[1].priceText, /2,49/);
+  assert.equal(cards[2].priceText, '0,80 € sparen! ab 0,99 € 1,99 €');
+  assert.equal(cards[2].packSizeText, '');
+  assert.doesNotMatch(cards[2].priceText, /1,19/);
+  assert.equal(cards[3].name, '20% Rabatt');
+  assert.equal(cards[3].text, '20% Rabatt');
+  assert.equal(cards[3].priceText, '');
+  assert.equal(cards[3].packSizeText, '');
+  assert.ok(cards.every((card) => card.cardKey === card.cardId));
+  assert.ok(!cards.some((card) => /Nächster Prospekt|Ähnliches Angebot|Nachbarprodukt/.test(card.text)));
+  assert.ok(!cards.some((card) => /notProvided|96c4796d/.test(card.sourceUrl)));
 });
 
 test('Prospekt-OCR normalisiert Screenshot-Skalierung und ordnet überlappende Zeilen zu', () => {

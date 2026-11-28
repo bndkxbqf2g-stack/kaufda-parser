@@ -1226,8 +1226,9 @@ export function dedupeOffers(offers = []) {
   });
 }
 
-async function readKaufdaSnapshot(page) {
-  return page.evaluate(() => {
+async function readKaufdaSnapshot(page, market = {}) {
+  const isKaufland = isKauflandMarket(market);
+  const snapshot = await page.evaluate((kaufland) => {
     const bodyText = document.body?.innerText ?? '';
     const bodyLines = bodyText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
     const locationText = bodyLines.find((line) => /\bkm\b/i.test(line) && /,/.test(line)) || null;
@@ -1245,6 +1246,44 @@ async function readKaufdaSnapshot(page) {
       return description.join(' ').replace(/\s+/g, ' ').trim();
     };
     const findPriceLabel = (lines) => lines.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis|ab\s+\d)/i.test(line.trim())) || null;
+
+    if (kaufland) {
+      // KaufDA renders Kaufland offers as productId anchors directly inside the offers CSS grid.
+      // Keep each anchor's own text; ancestors include prices and names from neighboring cards.
+      const grids = [...document.querySelectorAll('div.grid')];
+      const gridIndexes = new Map(grids.map((grid, index) => [grid, index]));
+      const gridRecords = [...document.querySelectorAll('a[href*="productId"]')].map((anchor) => {
+        const parent = anchor.parentElement;
+        const parentGridId = parent && gridIndexes.has(parent) && getComputedStyle(parent).display === 'grid'
+          ? gridIndexes.get(parent)
+          : null;
+        const rect = anchor.getBoundingClientRect();
+        const image = anchor.querySelector('img');
+        const imageSource = image?.currentSrc || image?.src || '';
+        const imageUrl = imageSource && /^https?:\/\//i.test(imageSource)
+          && !/(logo|einkaufsliste|hinzufügen|placeholder|fallback)/i.test(`${image?.alt || ''} ${image?.title || ''} ${imageSource}`)
+          ? imageSource
+          : null;
+        let productId = null;
+        try { productId = new URL(anchor.href).searchParams.get('productId'); } catch (_) { /* malformed link target */ }
+        return {
+          gridId: parentGridId,
+          isDirectGridChild: parentGridId != null,
+          isRendered: rect.width > 0 && rect.height > 0,
+          anchorClass: String(anchor.className ?? ''),
+          productId,
+          sourceUrl: anchor.href,
+          text: (anchor.innerText ?? '').trim(),
+          name: anchor.querySelector('[data-testid*="name"], [data-testid*="title"], [class*="offer-name"], [class*="product-name"], h2, h3, h4')?.textContent?.trim()
+            || image?.alt?.trim()
+            || image?.title?.trim()
+            || null,
+          imageUrl
+        };
+      });
+      return { bodyText, pageUrl: location.href, locationText, kauflandGridRecords: gridRecords };
+    }
+
     const selectors = [
       '[data-testid*="offer"]', '[data-testid*="Offer"]',
       '[data-testid*="product"]', '[data-testid*="Product"]',
@@ -1319,7 +1358,74 @@ async function readKaufdaSnapshot(page) {
       });
     }
     return { bodyText, pageUrl: location.href, locationText, cards };
-  });
+  }, isKaufland);
+  if (!isKaufland) return snapshot;
+  return { ...snapshot, cards: extractKauflandGridCards(snapshot.kauflandGridRecords) };
+}
+
+export function extractKauflandGridCards(records = []) {
+  const isOfferCardClass = (value) => {
+    const classes = new Set(String(value ?? '').split(/\s+/).filter(Boolean));
+    return classes.has('rounded-lg') && classes.has('border') && classes.has('cursor-pointer') && classes.has('flex');
+  };
+  const validRecords = records.filter((record) => record
+    && Number.isInteger(record.gridId)
+    && record.isDirectGridChild === true
+    && record.isRendered === true
+    && isOfferCardClass(record.anchorClass)
+    && typeof record.productId === 'string'
+    && record.productId.trim() !== ''
+    && record.productId !== 'notProvided');
+  const uniqueIdsByGrid = new Map();
+  for (const record of validRecords) {
+    const ids = uniqueIdsByGrid.get(record.gridId) ?? new Set();
+    ids.add(record.productId);
+    uniqueIdsByGrid.set(record.gridId, ids);
+  }
+  // Detail panels and related-offer widgets can contain their own links; the offers grid is the largest productId grid.
+  const selectedGridId = [...uniqueIdsByGrid.entries()]
+    .sort((left, right) => right[1].size - left[1].size)[0]?.[0];
+  if (selectedGridId == null) return [];
+
+  const packLineRe = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
+  const unitLineRe = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|€\s*\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|je\s+(?:100\s*(?:g|ml)|kg|g|l|ml|cl|liter|stück))/i;
+  const seenProductIds = new Set();
+  const cards = [];
+  for (const record of validRecords) {
+    if (record.gridId !== selectedGridId || seenProductIds.has(record.productId)) continue;
+    seenProductIds.add(record.productId);
+    const text = String(record.text ?? '').trim();
+    const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    const findDescription = () => {
+      const start = lines.findIndex((line) => packLineRe.test(line) && !unitLineRe.test(line));
+      if (start < 0) return '';
+      const description = [lines[start]];
+      for (const line of lines.slice(start + 1)) {
+        if (/€/.test(line) || unitLineRe.test(line) || /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) break;
+        if (/^(?:produktbeschreibung|preisdetails|angebotspreis|preis\s+pro\s+einheit)$/i.test(line)) break;
+        description.push(line);
+      }
+      return description.join(' ').replace(/\s+/g, ' ').trim();
+    };
+    const productDescription = findDescription();
+    const priceText = lines.filter((line) => /€/.test(line) && !unitLineRe.test(line)).join(' ');
+    const packSizeText = productDescription || lines.find((line) => packLineRe.test(line) && !unitLineRe.test(line)) || '';
+    cards.push({
+      cardId: record.productId,
+      cardKey: record.productId,
+      sourceUrl: record.sourceUrl,
+      imageUrl: record.imageUrl || null,
+      text,
+      name: record.name || null,
+      productDescription,
+      priceText,
+      priceLabel: lines.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis|ab\s+\d)/i.test(line)) || null,
+      packSizeText,
+      unitPriceText: lines.find((line) => /pro Einheit|kg\s*=|l\s*=|kg[- ]?Preis|l[- ]?Preis|\/kg|\/l/i.test(line)) || '',
+      validityText: lines.find((line) => /gültig|endet|noch\s+\d+\s+tage/i.test(line)) || ''
+    });
+  }
+  return cards;
 }
 
 function productIdFromUrl(value) {
@@ -1523,7 +1629,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   };
 
   while (pass < scroll.maxPasses) {
-    addSnapshot(await readKaufdaSnapshot(page));
+    addSnapshot(await readKaufdaSnapshot(page, market));
     const loadedCardCount = rawCards.size;
     if (expectedCountKind === 'cards' && expectedCount > 0 && loadedCardCount >= expectedCount) break;
     const progress = await page.evaluate(({ stepPx }) => {
@@ -1544,7 +1650,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
     pass += 1;
   }
 
-  addSnapshot(await readKaufdaSnapshot(page));
+  addSnapshot(await readKaufdaSnapshot(page, market));
   const fetchedAt = new Date().toISOString();
   const visibleLocation = lastSnapshot.locationText ?? null;
   const expectedLocation = market.location ?? config.location;

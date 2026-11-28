@@ -1,0 +1,93 @@
+{
+  "source": "Öffentliches KaufDA-Angebote-Raster, Kaufland Würzburg-Grombühl, geprüft 2026-11-28",
+  "records": [
+    {
+      "gridId": 0,
+      "isDirectGridChild": true,
+      "isRendered": true,
+      "anchorClass": "relative flex size-full cursor-pointer flex-col gap-md rounded-lg border border-gray text-dark",
+      "productId": "1098a84f-8ce9-4172-9b3c-65743b9c5799",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=63&locality=Zellingen&productId=1098a84f-8ce9-4172-9b3c-65743b9c5799",
+      "text": "- 59%\nab 0,55 €\nBueno Original\n1,35 €\n(1 l = 0.37)",
+      "name": "Bueno Original",
+      "imageUrl": "https://content-media.bonial.biz/1098a84f-8ce9-4172-9b3c-65743b9c5799/488a54f1-0261-43f2-971e-447c51e7b982.jpg?impolicy=DYCO_GRID_OFFER_IMAGE"
+    },
+    {
+      "gridId": 0,
+      "isDirectGridChild": true,
+      "isRendered": true,
+      "anchorClass": "relative flex size-full cursor-pointer flex-col gap-md rounded-lg border border-gray text-dark",
+      "productId": "2f5e2010-1e0f-467e-ae97-1fd864f2f18d",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=59&locality=Zellingen&productId=2f5e2010-1e0f-467e-ae97-1fd864f2f18d",
+      "text": "1,50 € sparen!\nab 1,99 €\nNuss-Nugat-Creme\n3,99 €\n(1 kg = 3.98)",
+      "name": "Nuss-Nugat-Creme",
+      "imageUrl": "https://content-media.bonial.biz/2f5e2010-1e0f-467e-ae97-1fd864f2f18d/22b5a208-1936-41a1-b851-f9341c33abfb.jpg?impolicy=DYCO_GRID_OFFER_IMAGE"
+    },
+    {
+      "gridId": 0,
+      "isDirectGridChild": true,
+      "isRendered": true,
+      "anchorClass": "relative flex size-full cursor-pointer flex-col gap-md rounded-lg border border-gray text-dark",
+      "productId": "8f231b07-9f19-41be-8550-6f569ae0abcf",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=5&locality=Zellingen&productId=8f231b07-9f19-41be-8550-6f569ae0abcf",
+      "text": "0,80 € sparen!\nab 0,99 €\nPfanner\n1,99 €",
+      "name": "Pfanner",
+      "imageUrl": "https://content-media.bonial.biz/8f231b07-9f19-41be-8550-6f569ae0abcf/4c74dc12-aea4-4862-99e8-4b3c8537e23e.jpg?impolicy=DYCO_GRID_OFFER_IMAGE"
+    },
+    {
+      "gridId": 0,
+      "isDirectGridChild": true,
+      "isRendered": true,
+      "anchorClass": "relative flex size-full cursor-pointer flex-col gap-md rounded-lg border border-gray text-dark",
+      "productId": "9cbd6ba9-d653-4deb-9b7e-6026bb53692e",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=68&locality=Zellingen&productId=9cbd6ba9-d653-4deb-9b7e-6026bb53692e",
+      "text": "20% Rabatt",
+      "name": "20% Rabatt",
+      "imageUrl": "https://content-media.bonial.biz/9cbd6ba9-d653-4deb-9b7e-6026bb53692e/0800410b-f5b7-49b1-ac8d-a8db11ff3aae.jpg?impolicy=DYCO_GRID_OFFER_IMAGE"
+    },
+    {
+      "gridId": null,
+      "isDirectGridChild": false,
+      "isRendered": true,
+      "anchorClass": "inline-block relative h-[250px] w-full overflow-hidden md:h-[350px]",
+      "productId": "notProvided",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?adPlacement=ad_placement__bv_brochure_page&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=1&locality=Zellingen&productId=notProvided",
+      "text": "",
+      "name": null,
+      "imageUrl": null
+    },
+    {
+      "gridId": null,
+      "isDirectGridChild": false,
+      "isRendered": true,
+      "anchorClass": "ml-auto flex h-[48px] shrink-0 cursor-pointer flex-row items-center justify-center gap-xs rounded-full border border-secondary bg-secondary pr-md pl-2xl text-center text-sm font-bold whitespace-nowrap text-white transition hover:bg-secondaryAction md:text-base",
+      "productId": "2f5e2010-1e0f-467e-ae97-1fd864f2f18d",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/62ad6d72-7351-4fad-8db1-c2866eecd231?adPlacement=ad_placement__next_brochure&lat=49.9016992&lng=9.812895&pageType=DE-P-Brochure&sourceType=PORTAL_NEXT_BROCHURE_BUTTON&zip=97225&page=1&locality=Zellingen&productId=2f5e2010-1e0f-467e-ae97-1fd864f2f18d&sourceValue=be566747-bcb2-4d8c-9da8-4873f6d738bd&adPlacementSource=ad_placement__next_brochure&element=next_brochure_button",
+      "text": "Nächster Prospekt",
+      "name": null,
+      "imageUrl": null
+    },
+    {
+      "gridId": null,
+      "isDirectGridChild": false,
+      "isRendered": true,
+      "anchorClass": "flex min-w-0 grow flex-row items-center gap-md",
+      "productId": "96c4796d-9d3a-4089-803e-467e59df10ef",
+      "sourceUrl": "https://www.kaufda.de/contentViewer/static/6e4b7805-35fa-4e32-82d5-34973a2915ca?adPlacement=ad_placement__bv_similar_offer&lat=49.9016992&lng=9.812895&pageType=DE-P-Brochure&sourceType=PORTAL_NEXT_SIMILAR_OFFER_BUTTON&zip=97225&page=11&locality=Zellingen&productId=96c4796d-9d3a-4089-803e-467e59df10ef&sourceValue=be566747-bcb2-4d8c-9da8-4873f6d738bd&feature=offer_details&element=next_similar_offer_button",
+      "text": "Ähnliches Angebot: Nuss-Nugat-Creme Weiter",
+      "name": "Nuss-Nugat-Creme",
+      "imageUrl": "https://content-media.bonial.biz/96c4796d-9d3a-4089-803e-467e59df10ef/171dc6e0-8066-4d20-865d-fcec6351433e.jpg?impolicy=previews"
+    },
+    {
+      "gridId": null,
+      "isDirectGridChild": false,
+      "isRendered": false,
+      "anchorClass": "",
+      "productId": null,
+      "sourceUrl": null,
+      "text": "Containertext mit mehreren Produktpreisen und Packungen aus den Nachbarkarten",
+      "name": null,
+      "imageUrl": null
+    }
+  ]
+}
