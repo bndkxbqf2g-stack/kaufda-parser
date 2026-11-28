@@ -30,6 +30,7 @@ import {
   parseUnitPrice,
   parseValidity,
   scoreKaufdaMarketResult,
+  selectNettoMarketResult,
   scaleOcrLinesToViewport,
   validateConfig,
   validateFullOutputDocument,
@@ -232,6 +233,48 @@ test('KaufDA wählt den aktuellen NEU-Prospekt statt einer Online-Nebenbroschür
   assert.ok(scoreKaufdaMarketResult(online) > scoreKaufdaMarketResult(upcoming));
 });
 
+test('Netto-Auswahl priorisiert gültige aktuelle Kachel und lehnt Online- und Nebenprospekte ab', () => {
+  const candidates = [
+    { text: 'Netto Marken-Discount\nFolgen\n\n3 Tage gültig\n\n• ENDET BALD', imageLabels: [{ alt: 'netto-online.de - Exklusive Angebote', title: 'netto-online.de - Exklusive Angebote' }] },
+    { text: 'Netto Marken-Discount\nFolgen\n\nIn 2 Tagen gültig\n\n• DEMNÄCHST GÜLTIG', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] },
+    { text: 'Netto Marken-Discount\nFolgen\n\nNur noch heute gültig\n\n• ENDET BALD', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] }
+  ];
+  const selected = selectNettoMarketResult(candidates, { referenceDate: '2026-11-28T08:44:50Z' });
+  assert.equal(selected.index, 2);
+  assert.equal(selected.candidates[0].onlineExclusive, true);
+  assert.equal(selected.candidates[0].currentOffersLabel, false);
+  assert.equal(selected.candidates[2].currentOffersLabel, true);
+  assert.equal(selected.candidates[0].validity, 'active');
+  assert.equal(selected.candidates[1].validity, 'upcoming');
+  assert.equal(selected.candidates[2].validity, 'active');
+});
+
+test('Netto-Auswahl lehnt Gleichstand und fehlende Angebotsbelege ab', () => {
+  const options = { referenceDate: '2026-11-28T08:44:50Z' };
+  const tie = selectNettoMarketResult([
+    { text: 'Netto Marken-Discount\n1 Woche gültig', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] },
+    { text: 'Netto Marken-Discount\n1 Woche gültig', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] }
+  ], options);
+  assert.equal(tie.index, null);
+  assert.equal(tie.reason, 'ambiguous-current-offer-evidence');
+  const noEvidence = selectNettoMarketResult([
+    { text: 'Netto Marken-Discount\n3 Tage gültig', imageLabels: [{ alt: 'netto-online.de - Exklusive Angebote', title: 'netto-online.de - Exklusive Angebote' }] },
+    { text: 'Netto Marken-Discount\nDemnächst gültig', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] }
+  ], options);
+  assert.equal(noEvidence.index, null);
+  assert.equal(noEvidence.reason, 'no-current-offer-evidence');
+});
+
+test('Netto-Auswahl erkennt Gültig ab trotz weiterer Datumsangabe', () => {
+  const result = selectNettoMarketResult([
+    { text: 'Netto Marken-Discount\nGültig ab 30.11.\nZusätzliche Aktion gültig bis 06.12.2026', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] },
+    { text: 'Netto Marken-Discount\nNur noch heute gültig', imageLabels: [{ alt: 'Aktuelle Angebote', title: 'Aktuelle Angebote' }] }
+  ], { referenceDate: '2026-11-28T08:44:50Z' });
+  assert.equal(result.index, 1);
+  assert.equal(result.candidates[0].validity, 'upcoming');
+  assert.equal(result.candidates[1].validity, 'active');
+});
+
 test('KaufDA-Fehlweiterleitungen werden als Quellenfehler erkannt', () => {
   assert.match(kaufdaPageFailure('https://www.kaufda.de/einkaufshelfer?city=Zellingen'), /Einkaufshelfer umgeleitet/);
   assert.match(kaufdaPageFailure('https://www.kaufda.de/anmelden'), /Anmeldeseite/);
@@ -388,6 +431,33 @@ test('ALDI SÜD gibt variable oder fehlende Packungsgrößen nicht planungsberei
   }, aldi, config).offer;
   assert.equal(measuredPack.packSizeValue, 500);
   assert.equal(measuredPack.planningStatus, 'ready');
+
+  const packedCoffee = assessOffer({
+    name: 'Crema',
+    text: 'Crema 8 x 1-kg-Packung 17,98 € sparen! 53,94 € 71,92 € Preis pro Einheit: 6.74',
+    priceText: '17,98 € sparen! 53,94 € 71,92 €',
+    unitPriceText: 'Preis pro Einheit: 6.74',
+    packSizeText: '8 x 1-kg-Packung',
+    sourceUrl: aldi.url
+  }, aldi, config, '2026-11-28T12:00:00Z').offer;
+  assert.equal(packedCoffee.unitPrice, 6.74);
+  assert.equal(packedCoffee.unitPriceUnit, 'kg');
+  assert.equal(packedCoffee.fieldStatus.unitPrice, 'inferred');
+  assert.equal(packedCoffee.evidence.price.inferenceSource, 'visible-offer-price-divided-by-visible-pack-size');
+
+  const twoVariantResult = assessOffer({
+    name: 'Milch Mäuse / Weihnachtsmaus',
+    productDescription: 'Milch Mäuse: 130-g-Packung | Weihnachtsmaus: 95-g-Figur',
+    text: 'Milch Mäuse / Weihnachtsmaus\nMilch Mäuse: 130-g-Packung | Weihnachtsmaus: 95-g-Figur\nMilch Mäuse: 1,99 € | Weihnachtsmaus: 1,69 €',
+    priceText: 'Milch Mäuse: 1,99 € | Weihnachtsmaus: 1,69 €',
+    packSizeText: 'Milch Mäuse: 130-g-Packung | Weihnachtsmaus: 95-g-Figur',
+    sourceUrl: aldi.url
+  }, aldi, config, '2026-11-28T12:00:00Z');
+  assert.equal(twoVariantResult.offer.previousPrice, null);
+  assert.equal(twoVariantResult.offer.basePrice, null);
+  assert.equal(twoVariantResult.offer.price, 1.99);
+  assert.equal(twoVariantResult.offer.fieldStatus.price, 'needs-review');
+  assert.equal(twoVariantResult.offer.planningStatus, 'needs-review');
 });
 
 test('ALDI SÜD blockiert belegte Wein- und Spirituosenangebote lokal', () => {
@@ -532,7 +602,19 @@ test('Packungsgröße, Grundpreis und Gültigkeit bleiben getrennt', () => {
   assert.deepEqual(parsePackSize('10 x 20 g = 200-g-Packung, Kühlung'), { text: '10 x 20 g', value: 200, unit: 'g', count: 10, itemValue: 20, itemUnit: 'g', ambiguous: false, variants: [] });
   assert.deepEqual(parsePackSize('1-l-Packung\n12 Packungen für insgesamt 9,99 €'), { text: '12 × 1 l', value: 12, unit: 'l', count: 12, itemValue: 1, itemUnit: 'l', ambiguous: false, variants: [] });
   assert.deepEqual(parsePackSize('Wintertee; Versch. Sorten; je 40-, 45- bzw. 55-g-Packung 20 Beutel'), { text: '40-, 45- bzw. 55-g-Packung', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: [40, 45, 55] });
+  assert.deepEqual(parsePackSize('Versch. Sorten 300-g-Packung 320-g-Packung'), {
+    text: '300 g / 320 g', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: [300, 320]
+  });
+  assert.deepEqual(parsePackSize('Vom Schwein; versch. Gewichte, z. B. 1000 g'), {
+    text: 'versch. Gewichte; z. B. 1000 g', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: []
+  });
   assert.deepEqual(parseUnitPrice('Preis pro Einheit: 1 kg = 8,88 €'), { amount: 8.88, unit: 'kg', text: 'Preis pro Einheit: 1 kg = 8,88 €' });
+  assert.deepEqual(parseUnitPrice('Preis pro Einheit: 1 kg = 5.35/6.60'), {
+    amount: null, unit: 'kg', text: 'Preis pro Einheit: 1 kg = 5.35/6.60', ambiguous: true
+  });
+  assert.deepEqual(parseUnitPrice('Preis pro Einheit: 5.97/kg bzw. 5.59/kg'), {
+    amount: null, unit: 'kg', text: 'Preis pro Einheit: 5.97/kg bzw. 5.59/kg', ambiguous: true
+  });
   assert.deepEqual(parseUnitPrice('kg-Preis 19.80'), { amount: 19.8, unit: 'kg', text: 'kg-Preis 19.80' });
   assert.deepEqual(parseValidity('Gültig vom 16.11.2026 bis 21.11.2026'), {
     validFrom: '2026-11-16', validUntil: '2026-11-21', status: 'complete', text: 'Gültig vom 16.11.2026 bis 21.11.2026'
@@ -638,8 +720,8 @@ test('Kaufland-Kachelangebote mit mehrdeutiger Packung oder unsicherer Warengrup
     imageOcr: { enabled: true, required: true, blockPlanning: false }
   });
 
-  // Die historische Kaufland-Karte führte 0,37 €/l aus der Nachbarbeschreibung
-  // mit; ohne eindeutige Packungsgröße darf sie nicht automatisch planbar sein.
+  // Die historische Kaufland-Karte führte 0,37 €/l aus einer Nachbarbeschreibung
+  // an eine Bueno-Packung in Gramm. Die Einheitenkollision verwirft den Preis.
   const bueno = assessOffer({
     cardId: 'kaufland-bueno-ambiguous-pack',
     name: 'Bueno Original',
@@ -650,11 +732,10 @@ test('Kaufland-Kachelangebote mit mehrdeutiger Packung oder unsicherer Warengrup
     unitPriceText: '0,37 €/l',
     sourceUrl: 'https://www.kaufda.de/angebote/kaufland-bueno'
   }, kaufland, config, fixture.capturedAt);
-  assert.equal(bueno.recognized, true);
-  assert.equal(bueno.offer.price, 0.55);
-  assert.equal(bueno.offer.unitPrice, 0.37);
-  assert.equal(bueno.offer.fieldStatus.packSize, 'ambiguous');
-  assert.equal(bueno.offer.planningStatus, 'needs-review');
+  assert.equal(bueno.recognized, false);
+  assert.equal(bueno.reviewItem.price, null);
+  assert.equal(bueno.reviewItem.fieldStatus.price, 'needs-review');
+  assert.match(bueno.reviewItem.reasons.join(' '), /Packungseinheit widersprechen sich/);
 
   const pork = assessOffer({
     cardId: 'kaufland-schweinebauch-unclassified',
@@ -1051,6 +1132,8 @@ test('Lidl-Alternativgrößen 200/300 g und 185/195 g bleiben review-only', () =
         text: '0,30 € sparen! 0,99 € Thunfisch Filets in eigenem Saft 1,29 € 1 kg = 5.35/6.60 Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g 0,30 € sparen! 0,99 € 1,29 € Preis pro Einheit: 1 kg = 5.35/6.60 Gültig bis 28.11',
         productDescription: 'Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g',
         priceText: '0,30 € sparen! 0,99 € 1,29 €',
+        unitPrice: 5.35,
+        unitPriceUnit: 'kg',
         unitPriceText: 'Preis pro Einheit: 1 kg = 5.35/6.60',
         sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=33&locality=Zellingen&productId=89a79e9b-c583-4e50-9e29-741a9676a78c',
         sourceId: '89a79e9b-c583-4e50-9e29-741a9676a78c'
@@ -1068,9 +1151,23 @@ test('Lidl-Alternativgrößen 200/300 g und 185/195 g bleiben review-only', () =
     assert.equal(result.offer.packSizeUnit, 'g', raw.name);
     assert.equal(result.offer.fieldStatus.packSize, 'ambiguous', raw.name);
     assert.equal(result.offer.evidence.packaging.visibleText, visibleDescription, raw.name);
+    if (raw.name === 'Thunfisch Filets in eigenem Saft') {
+      assert.equal(result.offer.unitPrice, null);
+      assert.equal(result.offer.unitPriceText, 'Preis pro Einheit: 1 kg = 5.35/6.60');
+      assert.equal(result.offer.fieldStatus.unitPrice, 'ambiguous');
+    }
     assert.equal(result.offer.planningStatus, 'needs-review', raw.name);
     assert.equal(result.offer.status, 'needs-review', raw.name);
   }
+
+  const slashVariant = assessOffer({
+    ...cases[0].raw,
+    unitPrice: 11.1,
+    unitPriceUnit: 'kg',
+    unitPriceText: 'Preis pro Einheit: 1 kg = 11.10/8.70'
+  }, lidl, categoryConfig, '2026-11-28T11:22:24.147Z');
+  assert.equal(slashVariant.offer.unitPrice, null);
+  assert.equal(slashVariant.offer.fieldStatus.unitPrice, 'ambiguous');
 
   const nonLidl = assessOffer(cases[1].raw, { ...lidl, key: 'Other-Market', store: 'Other' }, categoryConfig, '2026-11-28T11:22:24.147Z');
   assert.equal(nonLidl.offer.pack, '195 g');
@@ -1103,6 +1200,11 @@ test('Lidl übernimmt vertauschte Detailpreise nur bei eindeutig passendem Karte
     text: '0,60 € sparen! ab 2,29 € Smoothie 2,89 € 1 l = 9.16 Versch. Sorten, Gekühlt. Je 250 ml 0,60 € sparen! 2,89 € 2,29 € Preis pro Einheit: 1 l = 9.16 Gültig bis 28.11',
     priceText: '0,60 € sparen! 2,89 € 2,29 €',
     cardPriceText: '0,60 € sparen! ab 2,29 € 2,89 €',
+    priceBlocks: [
+      { amountText: '2,89 €', label: 'Sonderpreis', conditions: 'Mit Lidl Plus' },
+      { amountText: '2,29 €', label: 'Angebotspreis', conditions: 'ohne App' },
+      { amountText: '2,89 €', label: 'Regulärer Preis', conditions: '' }
+    ],
     unitPriceText: 'Preis pro Einheit: 1 l = 9.16',
     packSizeText: 'Je 250 ml',
     sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?page=34&productId=d3a592ba-5a31-4c9d-a6b0-cd590f512531'
@@ -1112,6 +1214,7 @@ test('Lidl übernimmt vertauschte Detailpreise nur bei eindeutig passendem Karte
   assert.equal(confirmed.price, 2.29);
   assert.equal(confirmed.previousPrice, 2.89);
   assert.equal(confirmed.discountAmount, 0.6);
+  assert.equal(confirmed.priceLabel, 'Angebotspreis');
   assert.equal(confirmed.unitPrice, 9.16);
   assert.equal(confirmed.evidence.price.visibleText, raw.cardPriceText);
   assert.equal(confirmed.planningStatus, 'ready');
@@ -1168,6 +1271,8 @@ test('Packung und Angebotspreis reichen für die Rezeptplanung ohne Grundpreis o
 
 test('Lebensmittelklassifikation unterscheidet sicher, unsicher und Nichtlebensmittel', () => {
   assert.equal(classifyFood('Salami').label, 'food');
+  assert.equal(classifyFood('BBQ Spare Ribs vom Schwein').label, 'food');
+  assert.equal(isLikelyFood('BBQ Spare Ribs vom Schwein', mergeConfig()), true);
   assert.equal(classifyFood('Schwein').label, 'uncertain');
   assert.equal(classifyFood('Rotwein').label, 'nonfood');
   assert.equal(classifyFood('Schweinefleisch').label, 'food');
@@ -1182,6 +1287,22 @@ test('Lebensmittelklassifikation unterscheidet sicher, unsicher und Nichtlebensm
   assert.notEqual(classifyFood('Toaster').label, 'food');
   assert.notEqual(classifyFood('Wasserkocher').label, 'food');
   assert.notEqual(classifyFood('Kaffeevollautomat').label, 'food');
+});
+
+test('Beispielgewicht wird nicht als feste Packung oder sicherer Stückpreis ausgegeben', () => {
+  const result = assessOffer({
+    name: 'BBQ Spare Ribs',
+    productDescription: 'Vom Schwein; mariniert; vorgegart; versch. Gewichte, z. B. 1000 g',
+    price: 8.99,
+    priceText: '8,99 €',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/spare-ribs'
+  }, { key: 'Aldi-Sued-Zellingen', store: 'ALDI SÜD', interpretationProfile: 'aldi-sued-v1' }, mergeConfig(), '2026-11-28T12:00:00Z');
+  assert.equal(result.state, 'accepted');
+  assert.equal(result.classification.label, 'food');
+  assert.equal(result.offer.packSizeValue, null);
+  assert.equal(result.offer.fieldStatus.packSize, 'ambiguous');
+  assert.equal(result.offer.priceBasis, 'weight-based-unit-unknown');
+  assert.equal(result.offer.planningStatus, 'needs-review');
 });
 
 test('EDEKA-Angebote trennen Schweineschnitzel von Küchentüchern im Kategorie-Feed', () => {
@@ -1511,6 +1632,45 @@ test('EDEKA löst mehrdeutige Kachelpreise anhand gelabelter Detailblöcke auf',
   assert.equal(withoutDetails.basePrice, null);
   assert.equal(withoutDetails.fieldStatus.price, 'needs-review');
   assert.equal(withoutDetails.planningStatus, 'needs-review');
+
+  const appDiscount = assessOffer({
+    name: 'Arla Kærgården',
+    productDescription: 'Ungesalzen, 200 g Becher',
+    text: 'ab 0,99 € Arla Kærgården 1,39 € 2,79 € 1 kg = 4,95 verschiedene Sorten 200 g Becher',
+    priceText: '0,99 € 1,39 € 2,79 €',
+    cardPriceText: '0,99 € 1,39 €',
+    packSizeText: '200 g Becher',
+    priceBlocks: [
+      { amountText: '1,39 €', label: 'Angebotspreis', conditions: '', unitPriceText: '1 kg = 6,95' },
+      { amountText: '0,99 €', label: 'Sonderpreis', conditions: 'APP-PREIS² mit der EDEKA App', unitPriceText: '1 kg = 4,95' },
+      { amountText: '2,79 €', label: 'Regulärer Preis', conditions: '' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/edeka-app-price'
+  }, edeka, categoryConfig, '2026-11-28T12:00:00Z').offer;
+  assert.equal(appDiscount.price, 1.39);
+  assert.equal(appDiscount.loyaltyPrice, 0.99);
+  assert.equal(appDiscount.loyaltyProgram, 'EDEKA App');
+  assert.equal(appDiscount.priceLabel, 'Angebotspreis');
+  assert.equal(appDiscount.unitPrice, 6.95);
+  assert.equal(appDiscount.basePrice, 2.79);
+
+  const appLimitOffer = assessOffer({
+    name: 'Clementinen',
+    productDescription: '750-g-Netz',
+    text: 'ab 1,49 € Clementinen 1,99 € 1 kg = 1,99 Spanien Klasse I 750-g-Netz',
+    priceText: '1,49 € 1,99 €',
+    cardPriceText: '1,49 € 1,99 €',
+    packSizeText: '750-g-Netz',
+    priceBlocks: [
+      { amountText: '1,99 €', label: 'Angebotspreis', conditions: '', unitPriceText: '1 kg = 2,65' },
+      { amountText: '1,49 €', label: 'Sonderpreis', conditions: 'APP-PREIS² Höchstabgabemenge zum App-Preis: 5 Netze', unitPriceText: '1 kg = 1,99' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/edeka-clementinen-app-price'
+  }, edeka, categoryConfig, '2026-11-28T12:00:00Z').offer;
+  assert.equal(appLimitOffer.price, 1.99);
+  assert.equal(appLimitOffer.loyaltyPrice, 1.49);
+  assert.equal(appLimitOffer.purchaseLimitText, '5 Netze zum App-Preis');
+  assert.equal(appLimitOffer.unitPrice, 2.65);
 });
 
 test('Kaufland-Kacheln behalten widersprüchliche Sparpreise zur Prüfung', () => {
