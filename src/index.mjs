@@ -801,13 +801,12 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       ? raw.priceText ?? ''
       : raw.priceText || lines.join('\n');
   const parsedPriceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  const { currentPrice, previousPrice, discountAmount } = parsedPriceDetails;
   const priceArithmeticConflict = market.key === 'Edeka-Zellingen'
-    && Number.isFinite(parsedPriceDetails.currentPrice)
-    && Number.isFinite(parsedPriceDetails.previousPrice)
-    && Number.isFinite(parsedPriceDetails.discountAmount)
-    && Math.abs((parsedPriceDetails.previousPrice - parsedPriceDetails.currentPrice) - parsedPriceDetails.discountAmount) > 0.02;
+    && [currentPrice, previousPrice, discountAmount].every(Number.isFinite)
+    && Math.round(previousPrice * 100) - Math.round(currentPrice * 100) !== Math.round(discountAmount * 100);
   const priceDetails = priceArithmeticConflict
-    ? { ...parsedPriceDetails, previousPrice: null, type: 'discount-with-unverified-previous' }
+    ? { ...parsedPriceDetails, previousPrice: null, type: 'discount-with-current' }
     : parsedPriceDetails;
   const basePrice = priceArithmeticConflict
     ? null
@@ -900,7 +899,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       previousPrice: priceDetails.previousPrice,
       ...(priceArithmeticConflict ? {
         reconciliationStatus: 'needs-review',
-        reviewReason: 'Der sichtbare Sparbetrag passt nicht zum zugeordneten alten Preis; ein Grundpreis wird nicht als sicher ausgegeben.'
+        reviewReason: 'Der sichtbare Sparbetrag passt nicht zum zugeordneten Vorpreis.'
       } : {}),
       discountPercent: kauflandConditions.discountPercent,
       loyaltyPrice: kauflandConditions.loyaltyPrice,

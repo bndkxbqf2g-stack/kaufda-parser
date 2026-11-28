@@ -1181,6 +1181,7 @@ test('EDEKA setzt widersprüchliche Sparbeträge nicht als sicheren Vorpreis ein
     assert.equal(result.offer.previousPrice, null, item.name);
     assert.equal(result.offer.basePrice, null, item.name);
     assert.equal(result.offer.discountAmount, item.expectedSaving, item.name);
+    assert.equal(result.offer.priceType, 'discount-with-current', item.name);
     assert.equal(result.offer.fieldStatus.price, 'needs-review', item.name);
     assert.equal(result.offer.evidence.price.reconciliationStatus, 'needs-review', item.name);
     assert.match(result.offer.evidence.price.reviewReason, /Sparbetrag/);
