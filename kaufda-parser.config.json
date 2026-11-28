@@ -60,7 +60,15 @@
       "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
       "url": "https://www.kaufda.de/search?query=EDEKA&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
       "productGroups": ["food"],
-      "nonFoodTerms": ["Küchentücher"]
+      "foodTerms": ["Ananas", "Kohlrabi", "Papaya", "Laugenbrezel", "Schnitzel", "Weingummi", "Bierwurst"],
+      "nonFoodTerms": ["Küchentücher"],
+      "excludeTermsToIgnore": ["Wein", "Bier"],
+      "nonFoodProductTerms": ["Rotling", "Scheurebe", "Silvaner", "Primitivo", "Dornfelder", "Aperitivo", "Wein", "Bier", "Sekt", "Likör", "Spirituose", "Schnaps", "Whisky", "Whiskey", "Vodka", "Wodka", "Gin"],
+      "rejectExplicitAlcoholEvidence": true,
+      "requirePackForPlanning": true,
+      "requireFoodConfidenceForPlanning": true,
+      "inferPackFromBareStueck": true,
+      "normalizeLiterPackUnit": true
     },
     {
       "key": "Netto-Thuengersheim",
