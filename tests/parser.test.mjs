@@ -911,17 +911,19 @@ test('Lidl-Alternativgrößen 200/300 g und 185/195 g bleiben review-only', () =
     assert.equal(result.offer.status, 'needs-review', raw.name);
   }
 
-  const nonLidl = assessOffer(cases[1].raw, { ...lidl, key: 'Other-Market', store: 'Other' }, categoryConfig);
+  const nonLidl = assessOffer(cases[1].raw, { ...lidl, key: 'Other-Market', store: 'Other' }, categoryConfig, '2026-11-28T11:22:24.147Z');
   assert.equal(nonLidl.offer.pack, '195 g');
   assert.equal(nonLidl.offer.planningStatus, 'ready');
 
-  const repeatedSize = assessOffer({
-    name: 'Weichkäse', text: 'Weichkäse\nStandardpackung: 200 g 200 g\n3,33 €',
-    productDescription: 'Standardpackung: 200 g 200 g', priceText: '3,33 €', sourceUrl: lidl.url
-  }, lidl, categoryConfig);
-  assert.equal(repeatedSize.offer.pack, '200 g');
-  assert.equal(repeatedSize.offer.fieldStatus.packSize, 'visible');
-  assert.equal(repeatedSize.offer.planningStatus, 'ready');
+  for (const description of ['Standardpackung: 200 g 200 g', 'Je 200/200 g']) {
+    const repeatedSize = assessOffer({
+      name: 'Weichkäse', text: `Weichkäse\n${description}\n3,33 €`,
+      productDescription: description, priceText: '3,33 €', sourceUrl: lidl.url
+    }, lidl, categoryConfig);
+    assert.equal(repeatedSize.offer.pack, '200 g');
+    assert.equal(repeatedSize.offer.fieldStatus.packSize, 'visible');
+    assert.equal(repeatedSize.offer.planningStatus, 'ready');
+  }
 
   const laterDescriptionSize = assessOffer({
     name: 'Weichkäse', text: 'Weichkäse\nStandardpackung: 200 g. Hinweis: 300 g gibt es in einer anderen Variante.\n3,33 €',

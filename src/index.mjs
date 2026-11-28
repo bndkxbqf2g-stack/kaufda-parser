@@ -650,11 +650,10 @@ function parseLidlAlternativePackSize(value) {
 
   const slashAlternative = normalized.match(/\b(\d+(?:[,.]\d+)?)\s*(?:(kg|g|l|ml|cl|stück|stk\.?)\s*)?\/\s*(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|cl|stück|stk\.?)\b/i);
   if (slashAlternative) {
-    const unit = (slashAlternative[4] ?? slashAlternative[2] ?? '').replace('.', '').toLocaleLowerCase('de-DE');
+    const unit = slashAlternative[4].replace('.', '').toLocaleLowerCase('de-DE');
     const leftUnit = slashAlternative[2]?.replace('.', '').toLocaleLowerCase('de-DE');
-    const rightUnit = slashAlternative[4]?.replace('.', '').toLocaleLowerCase('de-DE');
     const variants = [slashAlternative[1], slashAlternative[3]].map(parseGermanNumber);
-    if (unit && (!leftUnit || leftUnit === unit) && (!rightUnit || rightUnit === unit) && variants.every(Number.isFinite)) {
+    if ((!leftUnit || leftUnit === unit) && variants.every(Number.isFinite) && variants[0] !== variants[1]) {
       return {
         text: `${slashAlternative[1]}/${slashAlternative[3]} ${unit}`,
         value: null,
@@ -816,20 +815,19 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const normalizedPackInput = market.normalizeLiterPackUnit === true
     ? packInput.replace(/\bliter\b/gi, 'l')
     : packInput;
-  const visiblePack = parsePackSize(normalizedPackInput);
   const lidlPackAlternatives = market.key === 'Lidl-Zellingen'
     ? parseLidlAlternativePackSize(normalizedPackInput)
     : null;
-  const effectiveVisiblePack = lidlPackAlternatives ?? visiblePack;
+  const visiblePack = lidlPackAlternatives ?? parsePackSize(normalizedPackInput);
   const canInferPackUnit = market.inferPackUnitFromUnitPrice === true
-    && !effectiveVisiblePack.text
+    && !visiblePack.text
     && ['kg', 'g', 'l', 'ml', 'cl'].includes(unit.unit)
     && /\b(?:je|pro)\s*\d+(?:[,.]\d+)?\b/i.test(packEvidenceText);
   const canInferSinglePiece = market.inferPackFromJeStueck === true
-    && !effectiveVisiblePack.text
+    && !visiblePack.text
     && /\bje\s+stück\b/i.test(packEvidenceText);
   const canInferBarePiece = market.inferPackFromBareStueck === true
-    && !effectiveVisiblePack.text
+    && !visiblePack.text
     && /\bstück\b/i.test(packEvidenceText);
   const pack = canInferPackUnit
     ? parsePackSize(normalizedPackInput, { fallbackUnit: unit.unit })
@@ -837,7 +835,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       ? parsePackSize('1 Stück')
       : canInferBarePiece
         ? parsePackSize('1 Stück')
-      : effectiveVisiblePack;
+      : visiblePack;
   const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
     loyaltyPrice: null,
