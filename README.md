@@ -124,6 +124,8 @@ Der verifizierte Live-Lauf der sichtbaren öffentlichen Seiten wurde am `2026-11
 
 Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittelangebote übernommen, 523 unsichere und 79 verworfene Karten. Dieser historische Lauf stammt noch aus der strengeren Klassifikationsstrecke vor dem Kategorieumfang. Kein Markt erreichte eine belastbare Kartenzielzahl; die Marktabdeckung bleibt deshalb `incomplete`. Davon sind 224 Angebote planungsbereit und 43 prüfpflichtig. Packungsgröße und Gültigkeit können bei anderen Karten `null` bleiben. `Kaufland Würzburg` lieferte in diesem Lauf keine als Lebensmittel bestätigten Angebote.
 
+Ein weiterer Kachellauf vom `2026-11-26` für dieselbe sichtbare Kaufland-Filiale (`Nürnberger Straße 12, 97076 Würzburg-Grombühl`) lud 129 Karten; der Reiter **Angebote** und die Kategorie **Lebensmittel und Getränke** waren sichtbar ausgewählt. Alle 129 Karten wurden erkannt und in den Kategorieumfang übernommen. Einzelne Kacheln enthielten mehrdeutige Packungs- oder Nachbarbeschreibungstexte. Kaufland-Karten bleiben deshalb nur dann planungsbereit, wenn die Packungsgröße eindeutig ist und die Lebensmittelklassifikation hohe Sicherheit erreicht; erkannte Preise und Belege werden dadurch nicht verändert. Der Prospekt-OCR-Pfad bleibt für gezielte Diagnosen erhalten, ist aber nicht die reguläre Kaufland-Quelle.
+
 ## Täglicher kostenloser Workflow
 
 `.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC und kann zusätzlich manuell über **Actions → KaufDA-Angebote aktualisieren → Run workflow** gestartet werden.

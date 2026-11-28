@@ -1,8 +1,8 @@
 # Kaufland-Angebotsinterpretation
 
-Dieses Dokument hält die gemeinsam am Prospekt vom 23.–28.11.2026 bestätigten Interpretationsregeln als Parser-Spezifikation fest. Es gilt zunächst ausschließlich für den konfigurierten Markt `Kaufland-Wuerzburg` über `interpretationProfile: kaufland-v1`. Für Netto und andere Märkte wird dieses Profil nicht übernommen, bevor deren Angebotsformate separat geprüft wurden.
+Dieses Dokument hält die Kaufland-Interpretationsregeln für `Kaufland-Wuerzburg` über `interpretationProfile: kaufland-v1` fest. Für Netto und andere Märkte wird dieses Profil nicht übernommen, bevor deren Angebotsformate separat geprüft wurden.
 
-Kaufland wird mit `collectionMode: prospect` über KaufDAs Prospektansicht erfasst. Die übrigen Märkte bleiben im vorhandenen Kachelmodus; insbesondere ist Netto von diesem Profil und dieser Quellumstellung ausgenommen. Regeln, die mangels explizitem Text oder eindeutiger OCR-Zuordnung nicht sicher ableitbar sind, bleiben prüfpflichtig.
+Kaufland verwendet im normalen Lauf den sichtbaren Reiter **Angebote** und `collectionMode: tiles`. Ein lokaler Feedstand vom 26.11.2026 belegt für dieselbe Filiale in der Nürnberger Straße 12, Würzburg-Grombühl, 129 geladene und erkannte Karten sowie 129 ausgewählte Kategorieangebote bei bestätigtem Standort. Der Prospekt-OCR-Code bleibt für gezielte Diagnosen erhalten, ist aber nicht der reguläre Angebotsweg. Regeln, die mangels explizitem Text oder eindeutiger Kartenbelege nicht sicher ableitbar sind, bleiben prüfpflichtig.
 
 ## Gesicherte Regeln
 
@@ -26,4 +26,4 @@ Wenn künftig eine neue Struktur erforderlich wird, muss sie zunächst optional 
 
 ## Grenzen
 
-Die Prospektseiten werden als Doppelseiten besucht. Sichtbare Produkt-Overlaybereiche werden mit lokaler OCR ausgewertet und OCR-Zeilen nur dann einem Produkt zugeordnet, wenn ihre Bildkoordinaten in dessen Bereich liegen. Ein Besuch aller Prospektseiten beweist noch keine vollständige Angebotserfassung; der Marktstatus bleibt deshalb `incomplete`, bis eine zuverlässige Angebotszielzahl oder eine anderweitige Vollständigkeitsmessung verfügbar ist. Produktnamen müssen durch die Bild-OCR bestätigt sein, bevor ein Prospektangebot als planungsbereit gilt. Preise, Packungsgrößen, Aktionsbedingungen und Seitenkopf-Gültigkeit benötigen sichtbare Textbelege. Nicht zugeordnete oder mehrdeutige Angaben bleiben prüfpflichtig.
+Der Diagnosepfad kann Prospektseiten weiterhin in Doppelseiten-Schritten besuchen. Sichtbare Produkt-Overlaybereiche werden mit lokaler OCR ausgewertet und OCR-Zeilen nur dann einem Produkt zugeordnet, wenn ihre Bildkoordinaten in dessen Bereich liegen. Ein Besuch aller Prospektseiten beweist keine vollständige Angebotserfassung. Für den normalen Kachellauf stammen Preis, Packung und Gültigkeit aus den sichtbaren Karten bzw. verlinkten öffentlichen Detailansichten. Mehrdeutige Packungen sowie unsichere Lebensmittelklassifikationen bleiben `needs-review`; erkannte Beträge werden nicht aus benachbarten Texten abgeleitet oder korrigiert.
