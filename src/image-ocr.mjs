@@ -130,19 +130,31 @@ export async function fetchTrustedImage(value, { fetchImpl = globalThis.fetch, m
   throw new Error('OCR-Bildabruf konnte nicht abgeschlossen werden.');
 }
 
-export function matchImageProductName({ cardName = '', ocrText = '', confidence = null, minConfidence = DEFAULT_MIN_CONFIDENCE } = {}) {
+export function matchImageProductName({ cardName = '', ocrText = '', ocrLines = null, confidence = null, minConfidence = DEFAULT_MIN_CONFIDENCE } = {}) {
   const visibleName = normalize(cardName);
   const visibleTokens = tokens(visibleName);
-  const lines = String(ocrText ?? '')
-    .split(/\r?\n+/)
-    .map(normalize)
-    .filter((line) => !looksLikeNoise(line));
-  const confidenceValue = Number(confidence);
-  const confidenceOkay = !Number.isFinite(confidenceValue) || confidenceValue >= minConfidence;
+  const toConfidence = (value) => {
+    if (value == null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const fallbackConfidence = toConfidence(confidence);
+  const sourceLines = Array.isArray(ocrLines)
+    ? ocrLines
+    : Array.isArray(ocrText)
+      ? ocrText
+      : String(ocrText ?? '').split(/\r?\n+/);
+  const lines = sourceLines
+    .map((entry) => {
+      const text = normalize(typeof entry === 'string' ? entry : entry?.text);
+      const lineConfidence = typeof entry === 'string' ? null : toConfidence(entry?.confidence);
+      return { text, confidence: lineConfidence ?? fallbackConfidence };
+    })
+    .filter((line) => !looksLikeNoise(line.text));
 
   let best = null;
-  for (const line of lines) {
-    const lineTokens = tokens(line);
+  for (const candidate of lines) {
+    const lineTokens = tokens(candidate.text);
     if (!lineTokens.length) continue;
     const overlap = visibleTokens.length
       ? visibleTokens.filter((token) => lineTokens.some((candidate) => candidate === token || candidate.startsWith(token) || token.startsWith(candidate))).length / visibleTokens.length
@@ -150,8 +162,10 @@ export function matchImageProductName({ cardName = '', ocrText = '', confidence 
     const score = overlap + (visibleTokens.length
       ? Math.min(0.2, 1 / Math.max(1, lineTokens.length))
       : Math.min(0.6, lineTokens.length / 5));
-    if (!best || score > best.score) best = { line, overlap, score };
+    if (!best || score > best.score) best = { line: candidate.text, overlap, score, confidence: candidate.confidence };
   }
+  const confidenceValue = best?.confidence ?? null;
+  const confidenceOkay = Number.isFinite(confidenceValue) && confidenceValue >= minConfidence;
 
   if (best && confidenceOkay && ((visibleTokens.length > 0 && best.overlap >= 0.5) || (!visibleTokens.length && tokens(best.line).length >= 2))) {
     return {

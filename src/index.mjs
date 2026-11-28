@@ -424,9 +424,27 @@ export function assignOcrLinesToRegions(lines = [], regions = []) {
     const containing = grouped
       .filter((region) => x >= region.x - 8 && x <= region.x + region.width + 8 && y >= region.y - 8 && y <= region.y + region.height + 8)
       .sort((left, right) => left.width * left.height - right.width * right.height);
-    containing[0]?.ocrLines.push(line.text);
+    const confidence = line.confidence == null || line.confidence === '' ? null : Number(line.confidence);
+    containing[0]?.ocrLines.push({
+      text: line.text,
+      confidence: Number.isFinite(confidence) ? confidence : null,
+      box: { ...line.box }
+    });
   }
-  return grouped.map((region) => ({ ...region, text: normalizeText(region.ocrLines.join('\n')) }));
+  return grouped.map((region) => ({
+    ...region,
+    text: region.ocrLines.map((line) => normalizeText(line.text)).filter(Boolean).join('\n')
+  }));
+}
+
+export function normalizeProspectProductName(linkLabel = '', imageMatch = {}) {
+  const visibleLabel = normalizeText(linkLabel).replace(/\s*(?:[-–—:]\s*)?link\s*$/i, '').trim();
+  const matchedText = normalizeText(imageMatch.matchedText ?? '');
+  const tokenCount = (value) => value.split(/\s+/).filter(Boolean).length;
+  if (imageMatch.status === 'verified' && matchedText && tokenCount(matchedText) > tokenCount(visibleLabel)) {
+    return matchedText;
+  }
+  return visibleLabel || (imageMatch.status === 'verified' ? matchedText : null);
 }
 
 export function parseDate(value, referenceDate = new Date()) {
@@ -1368,21 +1386,22 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
           const validityText = /\d{1,2}\.\d{1,2}/.test(region.text) ? region.text : pageValidityText;
           const imageMatch = matchImageProductName({
             cardName: region.name,
-            ocrText: region.text,
+            ocrLines: region.ocrLines,
             minConfidence: config.imageOcr?.minConfidence
           });
+          const productName = normalizeProspectProductName(region.name, imageMatch);
           const sourcePageNumber = Math.min(expectedPageCount, pageNumber + side);
           const sourcePage = new URL(pageUrl);
           sourcePage.searchParams.set('page', String(sourcePageNumber));
           const raw = {
             cardId: `${region.id}:page-${sourcePageNumber}`,
-            name: region.name,
+            name: productName,
             text: [region.name, region.text, validityText].filter(Boolean).join('\n'),
             priceText: region.text,
             validityText,
             sourceUrl: region.href && isKaufdaSourceUrl(region.href) ? region.href : pageUrl.href,
             sourcePage: sourcePage.href,
-            imageProductName: imageMatch.imageProductName,
+            imageProductName: imageMatch.status === 'verified' ? productName : imageMatch.imageProductName,
             imageProductStatus: imageMatch.status,
             imageOcrConfidence: imageMatch.confidence,
             visibleLocation,

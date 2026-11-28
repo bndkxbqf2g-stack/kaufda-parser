@@ -17,6 +17,7 @@ import {
   marketCollectionStatus,
   mergeConfig,
   matchVisibleLocation,
+  normalizeProspectProductName,
   normalizeOffer,
   PUBLISHED_OFFER_FIELDS,
   parseDate,
@@ -79,6 +80,50 @@ test('Kaufland verwendet Prospektseiten; Netto bleibt im Kachelmodus', () => {
   assert.deepEqual(parsePriceDetails('Gratis für mindestens 10 Euro Einkauf'), {
     currentPrice: null, previousPrice: null, discountAmount: null, type: 'missing', text: 'Gratis'
   });
+});
+
+test('Prospekt-OCR behält Zeilenkonfidenz und trennt Angebotsdaten vom Linklabel', () => {
+  const lines = [
+    { text: 'KINDER RIEGEL', confidence: 72, box: { x: 20, y: 20, width: 55, height: 12 } },
+    { text: '2,22 €', confidence: 98, box: { x: 20, y: 40, width: 38, height: 12 } },
+    { text: '182–210 g', confidence: 97, box: { x: 20, y: 60, width: 50, height: 12 } },
+    { text: '10,58–12,20 €/kg', confidence: 99, box: { x: 20, y: 80, width: 75, height: 12 } }
+  ];
+  const [region] = assignOcrLinesToRegions(lines, [
+    { id: 'kinder-riegel', name: 'Riegel – Link', x: 0, y: 0, width: 100, height: 110 }
+  ]);
+
+  assert.equal(region.text, 'KINDER RIEGEL\n2,22 €\n182–210 g\n10,58–12,20 €/kg');
+  assert.deepEqual(region.ocrLines.map((line) => line.confidence), [72, 98, 97, 99]);
+
+  const imageMatch = matchImageProductName({
+    cardName: region.name,
+    ocrLines: region.ocrLines,
+    minConfidence: 20
+  });
+  assert.equal(imageMatch.status, 'verified');
+  assert.equal(imageMatch.matchedText, 'KINDER RIEGEL');
+  assert.equal(imageMatch.confidence, 72);
+  const productName = normalizeProspectProductName(region.name, imageMatch);
+  assert.equal(productName, 'KINDER RIEGEL');
+
+  const kaufland = { key: 'Kaufland-Wuerzburg', label: 'Kaufland Würzburg', store: 'Kaufland', collectionMode: 'prospect' };
+  const result = assessOffer({
+    name: productName,
+    text: region.text,
+    priceText: region.text,
+    packSizeText: '182–210 g',
+    imageProductName: productName,
+    imageProductStatus: imageMatch.status,
+    imageOcrConfidence: imageMatch.confidence,
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/kinder-riegel'
+  }, kaufland, mergeConfig({ imageOcr: { enabled: true, required: true, blockPlanning: false } }), '2026-11-27T08:00:00Z');
+
+  assert.equal(result.state, 'accepted');
+  assert.equal(result.offer.product, 'KINDER RIEGEL');
+  assert.equal(result.offer.price, 2.22);
+  assert.equal(result.offer.fieldStatus.imageProduct, 'verified');
+  assert.equal(result.offer.planningStatus, 'needs-review');
 });
 
 test('KaufDA wählt den aktuellen NEU-Prospekt statt einer Online-Nebenbroschüre', () => {
