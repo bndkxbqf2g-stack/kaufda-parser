@@ -432,6 +432,21 @@ test('ALDI SÜD gibt variable oder fehlende Packungsgrößen nicht planungsberei
   assert.equal(measuredPack.packSizeValue, 500);
   assert.equal(measuredPack.planningStatus, 'ready');
 
+  const repeatedVariantPack = assessOffer({
+    name: 'Flammkuchen',
+    productDescription: 'Versch. Sorten 300-g-Packung 320-g-Packung',
+    text: 'Flammkuchen\nVersch. Sorten 300-g-Packung 320-g-Packung\n1,79 €',
+    priceText: '1,79 €',
+    packSizeText: 'Versch. Sorten 300-g-Packung 320-g-Packung',
+    unitPriceText: '5.97/kg bzw. 5.59/kg',
+    sourceUrl: aldi.url
+  }, aldi, config, '2026-11-28T12:00:00Z').offer;
+  assert.equal(repeatedVariantPack.pack, '300 g / 320 g');
+  assert.equal(repeatedVariantPack.packSizeValue, null);
+  assert.equal(repeatedVariantPack.fieldStatus.packSize, 'ambiguous');
+  assert.equal(repeatedVariantPack.unitPrice, null);
+  assert.equal(repeatedVariantPack.fieldStatus.unitPrice, 'ambiguous');
+
   const packedCoffee = assessOffer({
     name: 'Crema',
     text: 'Crema 8 x 1-kg-Packung 17,98 € sparen! 53,94 € 71,92 € Preis pro Einheit: 6.74',
@@ -603,6 +618,9 @@ test('Packungsgröße, Grundpreis und Gültigkeit bleiben getrennt', () => {
   assert.deepEqual(parsePackSize('1-l-Packung\n12 Packungen für insgesamt 9,99 €'), { text: '12 × 1 l', value: 12, unit: 'l', count: 12, itemValue: 1, itemUnit: 'l', ambiguous: false, variants: [] });
   assert.deepEqual(parsePackSize('Wintertee; Versch. Sorten; je 40-, 45- bzw. 55-g-Packung 20 Beutel'), { text: '40-, 45- bzw. 55-g-Packung', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: [40, 45, 55] });
   assert.deepEqual(parsePackSize('Versch. Sorten 300-g-Packung 320-g-Packung'), {
+    text: '300 g / 320 g', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: [300, 320]
+  });
+  assert.deepEqual(parsePackSize('Versch. Sorten 300-g-Packung 320-g-Packung\n300-g-Packung 320-g-Packung'), {
     text: '300 g / 320 g', value: null, unit: 'g', count: null, itemValue: null, itemUnit: 'g', ambiguous: true, variants: [300, 320]
   });
   assert.deepEqual(parsePackSize('Vom Schwein; versch. Gewichte, z. B. 1000 g'), {

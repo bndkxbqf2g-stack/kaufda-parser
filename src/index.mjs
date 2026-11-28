@@ -755,10 +755,17 @@ export function parsePackSize(value, { fallbackUnit = null } = {}) {
   const explicitVariants = [...normalized.matchAll(/\b(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl)\s*[- ]*(?:pack(?:g|ung)?\.?)/gi)];
   if (explicitVariants.length > 1) {
     const units = uniqueStrings(explicitVariants.map((match) => match[2].toLocaleLowerCase('de-DE')));
-    const variants = explicitVariants.map((match) => parseGermanNumber(match[1]));
+    const uniqueVariants = explicitVariants.filter((match, index, matches) => {
+      const value = parseGermanNumber(match[1]);
+      const unit = match[2].toLocaleLowerCase('de-DE');
+      return matches.findIndex((candidate) =>
+        parseGermanNumber(candidate[1]) === value && candidate[2].toLocaleLowerCase('de-DE') === unit
+      ) === index;
+    });
+    const variants = uniqueVariants.map((match) => parseGermanNumber(match[1]));
     if (units.length === 1 && variants.every(Number.isFinite) && new Set(variants).size > 1) {
       return {
-        text: explicitVariants.map((match) => `${match[1]} ${units[0]}`).join(' / '),
+        text: uniqueVariants.map((match) => `${match[1]} ${units[0]}`).join(' / '),
         value: null,
         unit: units[0],
         count: null,
