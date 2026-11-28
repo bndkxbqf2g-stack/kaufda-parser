@@ -39,7 +39,7 @@ export const DEFAULT_EXCLUDE_TERMS = [
 ];
 
 export const DEFAULT_FOOD_TERMS = [
-  'salami', 'wurst', 'schinken', 'fleisch', 'hackfleisch', 'hähnchen', 'pute',
+  'salami', 'wurst', 'schinken', 'fleisch', 'hackfleisch', 'hähnchen', 'pute', 'spare ribs', 'rippchen',
   'fisch', 'lachs', 'thunfisch', 'tofu', 'käse', 'milch', 'joghurt', 'quark',
   'butter', 'margarine', 'ei', 'eier', 'brot', 'brötchen', 'toast', 'mehl',
   'zucker', 'reis', 'nudel', 'pasta', 'müsli', 'hafer', 'haferdrink', 'cornflakes',
@@ -274,6 +274,53 @@ export function scoreKaufdaMarketResult(value = '') {
   return score;
 }
 
+function nettoSearchResultValidity(value = '', referenceDate = new Date()) {
+  const text = normalizeText(value);
+  const upcoming = /\b(?:demnächst\s+gültig|in\s+\d+\s+tagen?\s+gültig|ab\s+morgen\s+gültig|ab\s+in\s+\d+\s+tagen?\s+gültig)\b/iu;
+  if (upcoming.test(text)) return 'upcoming';
+  const reference = new Date(referenceDate);
+  if (!Number.isFinite(reference.getTime())) return 'unknown';
+  const today = kaufdaCalendarDate.format(reference);
+  const startsOn = text.match(/\b(?:gültig\s+ab|ab)\s*(\d{1,2}\.\d{1,2}(?:\.\d{2,4})?\.?)/i);
+  if (startsOn) {
+    const startDate = parseDate(`gültig bis ${startsOn[1]}`, reference);
+    if (startDate && startDate > today) return 'upcoming';
+  }
+  const validity = parseValidity(text, reference);
+  if (validity.validFrom && validity.validFrom > today) return 'upcoming';
+  if (validity.validUntil) return validity.validUntil >= today ? 'active' : 'expired';
+  if (/\b\d+\s+(?:tage?|wochen?)\s+gültig\b|\b(?:nur\s+noch\s+)?heute\s+gültig\b|\bnoch\s+bis\s+(?:heute|morgen)\s+gültig\b|\bendet\s+(?:heute|morgen|in\s+\d+\s+tagen?)\b/iu.test(text)) return 'active';
+  return 'unknown';
+}
+
+export function selectNettoMarketResult(values = [], { referenceDate = new Date(), foodTerms = DEFAULT_FOOD_TERMS, excludeTerms = DEFAULT_EXCLUDE_TERMS, nonFoodTerms = DEFAULT_NON_FOOD_TERMS } = {}) {
+  const evaluated = values.map((value, index) => {
+    const candidate = typeof value === 'string' ? { text: value } : (value ?? {});
+    const text = normalizeText(candidate.text ?? candidate.innerText ?? '');
+    const labels = uniqueStrings([...(Array.isArray(candidate.imageLabels) ? candidate.imageLabels.flatMap((image) => [image?.alt, image?.title]) : []), candidate.alt, candidate.title].map((label) => normalizeText(label ?? '')).filter(Boolean));
+    const validity = nettoSearchResultValidity(text, referenceDate);
+    const combinedText = normalizeText([text, ...labels].join(' '));
+    const onlineExclusive = /\b(?:online|exklusive\s+angebote)\b/iu.test(combinedText);
+    const currentOffersLabel = labels.some((label) => /\baktuelle\s+angebote\b/iu.test(label));
+    if (validity !== 'active' || onlineExclusive) return { index, validity, labels, onlineExclusive, currentOffersLabel, foodMatches: [], score: null };
+    const foodMatches = termsFound(combinedText, foodTerms);
+    const nonFoodMatches = termsFound(combinedText, [...excludeTerms, ...nonFoodTerms]);
+    const score = foodMatches.length - nonFoodMatches.length;
+    if (!(currentOffersLabel || (foodMatches.length > 0 && score > 0))) return { index, validity, labels, onlineExclusive, currentOffersLabel, foodMatches, nonFoodMatches, score: null };
+    return { index, validity, labels, onlineExclusive, currentOffersLabel, foodMatches, nonFoodMatches, score: (currentOffersLabel ? 1 : 0) + score };
+  });
+  const eligible = evaluated.filter((candidate) => candidate.score != null);
+  if (!eligible.length) return { index: null, reason: 'no-current-offer-evidence', candidates: evaluated };
+  const bestScore = Math.max(...eligible.map((candidate) => candidate.score));
+  const best = eligible.filter((candidate) => candidate.score === bestScore);
+  if (best.length !== 1) return { index: null, reason: 'ambiguous-current-offer-evidence', candidates: evaluated };
+  return { index: best[0].index, reason: null, score: bestScore, foodMatches: best[0].foodMatches, candidates: evaluated };
+}
+
+function isNettoMarket(market = {}) {
+  return /netto\s*marken\s*[-–]?\s*discount/i.test(`${market.key ?? ''} ${market.store ?? ''} ${market.label ?? ''}`);
+}
+
 export function kaufdaPageFailure(url = '') {
   try {
     const pathname = new URL(url).pathname.toLocaleLowerCase('de-DE');
@@ -390,6 +437,43 @@ function chooseLidlCardPriceDetails(detailPrice, cardPriceText) {
   return difference === Math.round(cardPrice.discountAmount * 100) ? cardPrice : null;
 }
 
+function chooseLidlCardPriceLabel(priceBlocks, cardPriceDetails) {
+  if (!Array.isArray(priceBlocks) || !Number.isFinite(cardPriceDetails?.currentPrice)) return null;
+  const rows = priceBlocks.map((block) => ({
+    label: normalizeText(block.label ?? ''),
+    amount: parsePrice(block.amountText)
+  })).filter((row) => Number.isFinite(row.amount)
+    && /^(?:angebotspreis|aktionspreis)$/i.test(row.label)
+    && row.amount === cardPriceDetails.currentPrice);
+  return rows.length === 1 ? rows[0].label : null;
+}
+
+function hasNamedAldiPriceVariants(raw, market) {
+  if (market.interpretationProfile !== 'aldi-sued-v1') return false;
+  const description = normalizeText(raw.productDescription ?? '');
+  const priceText = normalizeText(raw.priceText ?? '');
+  const variants = [...description.matchAll(/(?:^|\|\s*)([^:|]+):\s*[^|]+/g)]
+    .map((match) => normalizeText(match[1]).toLocaleLowerCase('de-DE'))
+    .filter(Boolean);
+  const pricedVariants = [...priceText.matchAll(/(?:^|\|\s*)([^:|]+):\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)/g)]
+    .map((match) => ({ name: normalizeText(match[1]).toLocaleLowerCase('de-DE'), amount: parseGermanNumber(match[2]) }))
+    .filter((row) => Number.isFinite(row.amount));
+  return variants.length > 1 && pricedVariants.length > 1
+    && new Set(pricedVariants.map((row) => row.amount)).size > 1
+    && pricedVariants.every((row) => variants.some((name) => name === row.name));
+}
+
+function hasPackUnitDimensionConflict(packUnit, priceUnit) {
+  const dimension = (unit) => /^(?:kg|g)$/i.test(String(unit ?? ''))
+    ? 'mass'
+    : /^(?:l|ml|cl|liter)$/i.test(String(unit ?? ''))
+      ? 'volume'
+      : null;
+  const packDimension = dimension(packUnit);
+  const priceDimension = dimension(priceUnit);
+  return Boolean(packDimension && priceDimension && packDimension !== priceDimension);
+}
+
 function parseKauflandConditions(value = '') {
   const text = normalizeText(value);
   const xtraPricePatterns = [
@@ -452,10 +536,31 @@ function readEdekaLabeledPriceBlocks(blocks, priceText = '') {
   if (!rows.every((row) => Number.isFinite(row.amount))) return null;
   const regularRows = rows.filter((row) => row.normalizedLabel === 'regulärer preis');
   const offerRows = rows.filter((row) => ['angebotspreis', 'aktionspreis', 'sonderpreis'].includes(row.normalizedLabel));
-  if (regularRows.length !== 1 || offerRows.length < 1) return null;
-
   const cardPrice = parsePriceDetails(priceText);
   if (!Number.isFinite(cardPrice.currentPrice)) return null;
+  const appRows = offerRows.filter((row) => /\bapp(?:-preis)?\b/i.test(`${row.normalizedLabel} ${row.conditions}`));
+  const standardRows = offerRows.filter((row) => !appRows.includes(row));
+  if (appRows.length === 1 && standardRows.length === 1
+      && cardPrice.currentPrice === appRows[0].amount
+      && (regularRows.length <= 1)) {
+    const standard = standardRows[0];
+    const app = appRows[0];
+    const regular = regularRows[0] ?? null;
+    const saving = regular ? Math.round((regular.amount - standard.amount) * 100) / 100 : null;
+    const appLimit = app.conditions.match(/(?:höchstabgabemenge|max(?:imal)?\.?)[^\d]{0,40}(\d+)\s*([a-zäöüß]+)/i);
+    return {
+      currentPrice: standard.amount,
+      previousPrice: regular?.amount ?? null,
+      discountAmount: saving != null && saving > 0 ? saving : null,
+      type: regular ? 'offer-with-previous' : 'offer-price',
+      priceLabel: standard.label,
+      unitPriceText: standard.unitPriceText ?? '',
+      loyaltyPrice: app.amount,
+      loyaltyProgram: 'EDEKA App',
+      purchaseLimitText: appLimit ? `${appLimit[1]} ${appLimit[2]} zum App-Preis` : null
+    };
+  }
+  if (regularRows.length !== 1 || offerRows.length < 1) return null;
   const selectedRows = offerRows.filter((row) => row.amount === cardPrice.currentPrice);
   if (selectedRows.length !== 1) return null;
   const selected = selectedRows[0];
@@ -468,6 +573,9 @@ function readEdekaLabeledPriceBlocks(blocks, priceText = '') {
     type: cardPrice.discountAmount == null ? 'offer-with-previous' : 'discount-with-previous',
     priceLabel: selected.label,
     unitPriceText: selected.unitPriceText ?? '',
+    loyaltyPrice: null,
+    loyaltyProgram: null,
+    purchaseLimitText: null,
     minimumPurchaseQuantity: minimum ? Number(minimum[1]) : null,
     minimumPurchaseUnit: minimum ? minimum[2] : null,
     minimumPurchaseText: minimum ? minimum[0] : null
@@ -610,6 +718,22 @@ export function parsePackSize(value, { fallbackUnit = null } = {}) {
   const normalized = normalizeText(value);
   if (!normalized) return { text: null, value: null, unit: null, count: null, itemValue: null, itemUnit: null, ambiguous: false, variants: [] };
 
+  const variableWeight = normalized.match(/\b(?:versch\.?\s+gewichte|verschiedene\s+gewichte|variabel\s+gewichtet)\b/i);
+  if (variableWeight) {
+    const example = normalized.slice(variableWeight.index).match(/z\.?\s*b\.?\s*(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|cl)\b/i);
+    const unit = example?.[2]?.toLocaleLowerCase('de-DE') ?? null;
+    return {
+      text: example ? `${variableWeight[0]}; z. B. ${example[1]} ${unit}` : variableWeight[0],
+      value: null,
+      unit,
+      count: null,
+      itemValue: null,
+      itemUnit: unit,
+      ambiguous: true,
+      variants: []
+    };
+  }
+
   const range = normalized.match(PACK_RANGE_RE);
   if (range) {
     const unit = range[1].match(/(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?$/i)?.[1]?.replace('.', '').toLocaleLowerCase('de-DE') ?? null;
@@ -626,6 +750,24 @@ export function parsePackSize(value, { fallbackUnit = null } = {}) {
       ambiguous: true,
       variants
     };
+  }
+
+  const explicitVariants = [...normalized.matchAll(/\b(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl)\s*[- ]*(?:pack(?:g|ung)?\.?)/gi)];
+  if (explicitVariants.length > 1) {
+    const units = uniqueStrings(explicitVariants.map((match) => match[2].toLocaleLowerCase('de-DE')));
+    const variants = explicitVariants.map((match) => parseGermanNumber(match[1]));
+    if (units.length === 1 && variants.every(Number.isFinite) && new Set(variants).size > 1) {
+      return {
+        text: explicitVariants.map((match) => `${match[1]} ${units[0]}`).join(' / '),
+        value: null,
+        unit: units[0],
+        count: null,
+        itemValue: null,
+        itemUnit: units[0],
+        ambiguous: true,
+        variants
+      };
+    }
   }
 
   const multiplier = normalized.match(/\b(\d+)\s*[x×]\s*(\d+(?:[,.]\d+)?)\s*[- ]?(kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)/i);
@@ -762,6 +904,24 @@ export function parseUnitPrice(value) {
   const text = normalizeText(value);
   const perHundred = text.match(/(?:je|pro)\s+100\s*(g|ml)\s*(?:=|:)??\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/i);
   if (perHundred) return { amount: parseGermanNumber(perHundred[2]), unit: `100 ${perHundred[1].toLocaleLowerCase('de-DE')}`, text };
+  const slashValues = [...text.matchAll(/((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*(?:€\s*)?\/\s*(100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)/gi)];
+  if (slashValues.length) {
+    const units = uniqueStrings(slashValues.map((match) => match[2].replace(/\s+/g, ' ').toLocaleLowerCase('de-DE')));
+    if (slashValues.length > 1 && units.length === 1) {
+      return { amount: null, unit: units[0] === 'liter' ? 'l' : units[0], text, ambiguous: true };
+    }
+    if (slashValues.length === 1) {
+      const unit = units[0] === 'liter' ? 'l' : units[0];
+      return { amount: parseGermanNumber(slashValues[0][1]), unit, text };
+    }
+  }
+  const variantLine = text.match(/(?:1\s*)?(kg|g|l|ml|cl|stück|stk\.?)\s*=\s*(.+)/i);
+  if (variantLine) {
+    const values = variantLine[2].match(/(?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?/g) ?? [];
+    if (values.length > 1) {
+      return { amount: null, unit: variantLine[1].replace('.', '').toLocaleLowerCase('de-DE'), text, ambiguous: true };
+    }
+  }
   const match = text.match(UNIT_PRICE_RE);
   if (match) {
     const unit = (match[1] ?? match[4]).replace('.', '').replace(/\s+/g, ' ').toLocaleLowerCase('de-DE');
@@ -880,10 +1040,15 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       || (market.normalizeLiterPackUnit === true && /\b\d+(?:[,.]\d+)?\s*liter\b/i.test(line)))
       && !UNIT_PRICE_LINE_RE.test(line))
   ].filter(Boolean).join('\n');
-  const unit = appPriceBlocks ? parseUnitPrice(appPriceBlocks.standard.unitPriceText)
+  let unit = appPriceBlocks ? parseUnitPrice(appPriceBlocks.standard.unitPriceText)
     : edekaPriceBlocks?.unitPriceText ? parseUnitPrice(edekaPriceBlocks.unitPriceText)
     : raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE))
-      : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+      : (() => {
+        const parsedText = parseUnitPrice(raw.unitPriceText ?? '');
+        return parsedText.ambiguous
+          ? parsedText
+          : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+      })();
   const packInput = packEvidenceText || findPackSizeText(raw.text ?? text);
   const normalizedPackInput = market.normalizeLiterPackUnit === true
     ? packInput.replace(/\bliter\b/gi, 'l')
@@ -950,11 +1115,28 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     };
   }
   const cardPrice = market.key === 'Lidl-Zellingen' ? chooseLidlCardPriceDetails(detailPrice, raw.cardPriceText) : null;
+  const lidlCardPriceLabel = market.key === 'Lidl-Zellingen'
+    ? chooseLidlCardPriceLabel(raw.priceBlocks, cardPrice)
+    : null;
   const parsedPriceDetails = cardPrice ?? detailPrice;
   const { currentPrice, previousPrice, discountAmount } = parsedPriceDetails;
+  const aldiVariantPriceConflict = hasNamedAldiPriceVariants(raw, market);
+  const bareAldiUnitPrice = market.interpretationProfile === 'aldi-sued-v1'
+    ? normalizeText(raw.unitPriceText ?? '').match(/^Preis pro Einheit:\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)$/i)
+    : null;
+  if (!Number.isFinite(unit.amount) && bareAldiUnitPrice
+      && ['kg', 'l'].includes(pack.unit) && Number.isFinite(pack.value) && pack.value > 0
+      && Number.isFinite(currentPrice)) {
+    const amount = parseGermanNumber(bareAldiUnitPrice[1]);
+    const computed = currentPrice / pack.value;
+    if (Number.isFinite(amount) && Math.round(amount * 100) === Math.round(computed * 100)) {
+      unit = { amount, unit: pack.unit, text: raw.unitPriceText, inferred: true };
+    }
+  }
   const edekaMinimumPurchaseBlocksPlanning = market.key === 'Edeka-Zellingen'
     && Number.isFinite(edekaPriceBlocks?.minimumPurchaseQuantity)
     && edekaPriceBlocks.minimumPurchaseQuantity > 1;
+  const packUnitDimensionConflict = hasPackUnitDimensionConflict(pack.unit, unit.unit);
   const checkDiscountReconciliation = ['Edeka-Zellingen', 'Lidl-Zellingen'].includes(market.key)
     || (kaufland && market.collectionMode === 'tiles');
   const priceArithmeticConflict = checkDiscountReconciliation
@@ -962,8 +1144,12 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     && Math.round(previousPrice * 100) - Math.round(currentPrice * 100) !== Math.round(discountAmount * 100);
   const priceDetails = priceArithmeticConflict
     ? { ...parsedPriceDetails, previousPrice: null, type: 'discount-with-current' }
-    : parsedPriceDetails;
-  const basePrice = priceArithmeticConflict
+    : aldiVariantPriceConflict
+      ? { ...parsedPriceDetails, previousPrice: null, discountAmount: null, type: 'multi-variant-review' }
+      : packUnitDimensionConflict
+        ? { ...parsedPriceDetails, currentPrice: null, previousPrice: null, discountAmount: null, type: 'unit-pack-dimension-conflict' }
+      : parsedPriceDetails;
+  const basePrice = priceArithmeticConflict || aldiVariantPriceConflict || packUnitDimensionConflict
     ? null
     : raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice);
   const explicitActivation = raw.activationRequired ?? (/(?:gutschein|coupon|rabatt)/i.test(text) && /(?:aktivieren|aktivierung erforderlich)/i.test(text));
@@ -976,19 +1162,26 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     && /(?:kg|l)\s*[- ]?preis\b/i.test(text);
   const explicitWeightBasis = /(?:je|pro|\/|€\s*\/\s*)\s*100\s*g\b/i.test(`${text} ${unit.text ?? ''}`)
     || unit.unit === '100 g';
-  const weightUnitUnknown = (counterPrice || aldiLooseUnitPrice) && !explicitWeightBasis && !Number.isFinite(unit.amount);
-  const price = Number.isFinite(priceDetails.currentPrice)
+  const variableWeightCard = /\b(?:versch\.?\s+gewichte|verschiedene\s+gewichte|variabel\s+gewichtet)\b/i.test(text);
+  const weightUnitUnknown = (counterPrice || aldiLooseUnitPrice || variableWeightCard) && !explicitWeightBasis && !Number.isFinite(unit.amount);
+  const price = packUnitDimensionConflict ? null : Number.isFinite(priceDetails.currentPrice)
     ? priceDetails.currentPrice
     : Number.isFinite(reportedPrice)
       ? reportedPrice
       : explicitWeightBasis && unit.unit === '100 g'
         ? unit.amount
         : null;
-  const loyaltyPriceConflict = hasConflictingAppPrice(price, kauflandConditions.loyaltyPrice, activationRequired);
-  const loyaltyPrice = loyaltyPriceConflict ? null : kauflandConditions.loyaltyPrice;
+  const reportedLoyaltyPrice = edekaPriceBlocks?.loyaltyPrice ?? kauflandConditions.loyaltyPrice;
+  const loyaltyPriceConflict = hasConflictingAppPrice(price, reportedLoyaltyPrice, activationRequired);
+  const loyaltyPrice = loyaltyPriceConflict ? null : reportedLoyaltyPrice;
+  const loyaltyProgram = edekaPriceBlocks?.loyaltyProgram ?? kauflandConditions.loyaltyProgram;
+  const purchaseLimitText = edekaPriceBlocks?.purchaseLimitText ?? kauflandConditions.purchaseLimitText;
   const priceReviewReason = loyaltyPriceConflict
     ? 'Der zugeordnete App-Preis ist nicht niedriger als der Preis ohne App.'
-    : priceArithmeticConflict ? 'Der sichtbare Sparbetrag passt nicht zum zugeordneten Vorpreis.' : null;
+    : priceArithmeticConflict ? 'Der sichtbare Sparbetrag passt nicht zum zugeordneten Vorpreis.'
+      : aldiVariantPriceConflict ? 'Die Karte enthält mehrere benannte Varianten mit unterschiedlichen Preisen; die Preise werden nicht als Angebot/Vorpreis gepaart.'
+        : packUnitDimensionConflict ? 'Grundpreiseinheit und Packungseinheit widersprechen sich; der Preis wird nicht dieser Produktkarte zugeordnet.'
+          : null;
   const priceBasis = activationRequired
     ? 'conditional-coupon'
     : pack.count > 1
@@ -1047,7 +1240,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     productDescription: productDescription ? 'visible' : 'missing',
     price: priceReviewReason || activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
     packSize: canInferPackUnit || canInferSinglePiece || canInferBarePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
-    unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
+    unitPrice: unit.ambiguous ? 'ambiguous' : unit.inferred ? 'inferred' : Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
     source: validUrl(sourceUrl) ? 'visible' : 'missing'
   };
@@ -1063,16 +1256,17 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       } : {}),
       discountPercent: kauflandConditions.discountPercent,
       loyaltyPrice,
-      loyaltyProgram: kauflandConditions.loyaltyProgram,
+      loyaltyProgram,
       loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
       loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
       minimumPurchaseAmount: kauflandConditions.minimumPurchaseAmount,
       minimumPurchaseQuantity: edekaPriceBlocks?.minimumPurchaseQuantity ?? null,
       minimumPurchaseUnit: edekaPriceBlocks?.minimumPurchaseUnit ?? null,
       minimumPurchaseText: edekaPriceBlocks?.minimumPurchaseText ?? null,
-      purchaseLimitText: kauflandConditions.purchaseLimitText,
+      purchaseLimitText,
       unitPrice: Number.isFinite(unit.amount) ? unit.amount : null,
       unitPriceUnit: unit.unit ?? null,
+      ...(unit.inferred ? { inferenceSource: 'visible-offer-price-divided-by-visible-pack-size' } : {}),
       basis: priceBasis,
       activationRequired: Boolean(activationRequired),
       weightUnitUnknown
@@ -1203,7 +1397,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name,
     productDescription,
     price,
-    priceLabel: edekaPriceBlocks?.priceLabel ?? appPriceBlocks?.standard.label ?? (raw.priceLabel || findPriceLabel(lines)),
+    priceLabel: edekaPriceBlocks?.priceLabel ?? appPriceBlocks?.standard.label ?? lidlCardPriceLabel ?? (raw.priceLabel || findPriceLabel(lines)),
     basePrice,
     previousPrice: priceDetails.previousPrice,
     discountAmount: priceDetails.discountAmount,
@@ -1212,14 +1406,14 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     priceBasis,
     activationRequired: Boolean(activationRequired),
     loyaltyPrice,
-    loyaltyProgram: kauflandConditions.loyaltyProgram,
+    loyaltyProgram,
     loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
     loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
     minimumPurchaseAmount: kauflandConditions.minimumPurchaseAmount,
     minimumPurchaseQuantity: edekaPriceBlocks?.minimumPurchaseQuantity ?? null,
     minimumPurchaseUnit: edekaPriceBlocks?.minimumPurchaseUnit ?? null,
     minimumPurchaseText: edekaPriceBlocks?.minimumPurchaseText ?? null,
-    purchaseLimitText: kauflandConditions.purchaseLimitText,
+    purchaseLimitText,
     planningStatus: planningReady ? 'ready' : 'needs-review',
     currency: raw.currency ?? 'EUR',
     packSize: pack.text,
@@ -2114,13 +2308,27 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
           const marketResultCount = await marketResults.count();
           if (!marketResultCount) throw new Error(`Kein KaufDA-Suchergebnis für „${market.store ?? market.label ?? market.key}“ gefunden; aktuelle Seite: ${page.url()}`);
           let selectedIndex = 0;
-          let selectedScore = Number.NEGATIVE_INFINITY;
+          const candidateTexts = [];
+          const nettoMarket = isNettoMarket(market);
           for (let index = 0; index < marketResultCount; index += 1) {
-            const candidateText = await marketResults.nth(index).innerText().catch(() => '');
-            const candidateScore = scoreKaufdaMarketResult(candidateText);
-            if (candidateScore > selectedScore) {
-              selectedIndex = index;
-              selectedScore = candidateScore;
+            const result = marketResults.nth(index);
+            const text = await result.innerText().catch(() => '');
+            const candidate = { text };
+            if (nettoMarket) candidate.imageLabels = await result.locator('img').evaluateAll((images) => images.map((image) => ({ alt: image.getAttribute('alt') ?? '', title: image.getAttribute('title') ?? '' }))).catch(() => []);
+            candidateTexts.push(candidate);
+          }
+          if (nettoMarket) {
+            const selection = selectNettoMarketResult(candidateTexts, { referenceDate: new Date(), foodTerms: [...config.classification.foodTerms, ...(market.includeTerms ?? [])], excludeTerms: config.excludeTerms, nonFoodTerms: config.classification.nonFoodTerms });
+            if (selection.index == null) {
+              const reason = selection.reason === 'ambiguous-current-offer-evidence' ? 'Mehrere aktuell gültige Netto-Angebotskacheln sind gleich plausibel.' : 'Kein aktuell gültiger Netto-Treffer mit eindeutigem Angebots- oder Lebensmittelbeleg gefunden.';
+              throw new Error(`${reason} Es wurde kein Treffer geöffnet.`);
+            }
+            selectedIndex = selection.index;
+          } else {
+            let selectedScore = Number.NEGATIVE_INFINITY;
+            for (let index = 0; index < candidateTexts.length; index += 1) {
+              const candidateScore = scoreKaufdaMarketResult(candidateTexts[index].text);
+              if (candidateScore > selectedScore) { selectedIndex = index; selectedScore = candidateScore; }
             }
           }
           await marketResults.nth(selectedIndex).click();
