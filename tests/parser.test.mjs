@@ -11,6 +11,7 @@ import {
   buildOffersDocument,
   classifyFood,
   dedupeOffers,
+  extractKauflandGridCards,
   extractPriceText,
   isLikelyFood,
   kaufdaPageFailure,
@@ -39,6 +40,8 @@ import { parseCliArgs } from '../src/cli-args.mjs';
 
 const fixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-visible-cards.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+const kauflandGridFixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-kaufland-offer-grid.json');
+const kauflandGridFixture = JSON.parse(readFileSync(kauflandGridFixturePath, 'utf8'));
 const market = {
   key: 'Lidl-Zellingen',
   label: 'Lidl Zellingen',
@@ -112,6 +115,42 @@ test('Kaufland und Netto verwenden sichtbare Angebotskacheln; Prospektdiagnose b
   assert.deepEqual(parsePriceDetails('Gratis für mindestens 10 Euro Einkauf'), {
     currentPrice: null, previousPrice: null, discountAmount: null, type: 'missing', text: 'Gratis'
   });
+});
+
+test('Kaufland erfasst eindeutige Direktlinks aus dem Angebotsraster statt Navigation und Nachbarcontainer', () => {
+  const nutellaRecord = kauflandGridFixture.records[1];
+  const duplicateNutella = {
+    ...nutellaRecord,
+    text: `${nutellaRecord.text}\n0,10 € sparen!\n5,00 € Nachbarprodukt 500-g-Packung`
+  };
+  const cards = extractKauflandGridCards([...kauflandGridFixture.records, duplicateNutella]);
+
+  assert.equal(cards.length, 4);
+  assert.deepEqual(cards.map((card) => card.cardId), [
+    '1098a84f-8ce9-4172-9b3c-65743b9c5799',
+    '2f5e2010-1e0f-467e-ae97-1fd864f2f18d',
+    '8f231b07-9f19-41be-8550-6f569ae0abcf',
+    '9cbd6ba9-d653-4deb-9b7e-6026bb53692e'
+  ]);
+  assert.equal(cards[0].name, 'Bueno Original');
+  assert.equal(cards[0].priceText, 'ab 0,55 € 1,35 €');
+  assert.equal(cards[0].unitPriceText, '(1 l = 0.37)');
+  assert.equal(cards[0].packSizeText, '');
+  assert.equal(cards[1].sourceUrl, nutellaRecord.sourceUrl);
+  assert.equal(cards[1].priceText, '1,50 € sparen! ab 1,99 € 3,99 €');
+  assert.equal(cards[1].unitPriceText, '(1 kg = 3.98)');
+  assert.equal(cards[1].packSizeText, '');
+  assert.doesNotMatch(cards[1].priceText, /2,49/);
+  assert.equal(cards[2].priceText, '0,80 € sparen! ab 0,99 € 1,99 €');
+  assert.equal(cards[2].packSizeText, '');
+  assert.doesNotMatch(cards[2].priceText, /1,19/);
+  assert.equal(cards[3].name, '20% Rabatt');
+  assert.equal(cards[3].text, '20% Rabatt');
+  assert.equal(cards[3].priceText, '');
+  assert.equal(cards[3].packSizeText, '');
+  assert.ok(cards.every((card) => card.cardKey === card.cardId));
+  assert.ok(!cards.some((card) => /Nächster Prospekt|Ähnliches Angebot|Nachbarprodukt/.test(card.text)));
+  assert.ok(!cards.some((card) => /notProvided|96c4796d/.test(card.sourceUrl)));
 });
 
 test('Prospekt-OCR normalisiert Screenshot-Skalierung und ordnet überlappende Zeilen zu', () => {
@@ -797,6 +836,77 @@ test('Kaufland-XTRA, Punkte, Mindestkauf, Kauflimit und Prozentaktionen bleiben 
   assert.equal(netto.discountPercent, null);
 });
 
+test('Kaufland trennt XTRA, Angebotspreis und regulären Preis nach sichtbaren Preisblöcken', () => {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const kaufland = { key: 'Kaufland-Wuerzburg', store: 'Kaufland', collectionMode: 'tiles', requirePackForPlanning: true };
+  const nut = assessOffer({
+    name: 'Nuss-Nugat-Creme',
+    text: '1,50 € sparen! ab 1,99 € Nuss-Nugat-Creme 3,99 € cremig-nussiger Brotaufstrich je 500-g-Glas',
+    priceText: '1,50 € sparen! 1,99 € 2,49 € 3,99 €',
+    packSizeText: '500-g-Glas',
+    priceBlocks: [
+      { amountText: '1,99 €', label: 'Sonderpreis', conditions: 'Limitiert max. 3 Stück 50% Preis pro Einheit: (1 kg = 3.98) zum Kaufland Card-Xtra Preis', unitPriceText: 'Preis pro Einheit: (1 kg = 3.98)' },
+      { amountText: '2,49 €', label: 'Angebotspreis', conditions: 'Preis pro Einheit: (1 kg = 4.98)', unitPriceText: 'Preis pro Einheit: (1 kg = 4.98)' },
+      { amountText: '3,99 €', label: 'Regulärer Preis', conditions: '', unitPriceText: '' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?page=59&productId=2f5e2010-1e0f-467e-ae97-1fd864f2f18d'
+  }, kaufland, config, fixture.capturedAt).offer;
+  assert.equal(nut.price, 2.49);
+  assert.equal(nut.loyaltyPrice, 1.99);
+  assert.equal(nut.previousPrice, 3.99);
+  assert.equal(nut.discountAmount, 1.5);
+  assert.equal(nut.unitPrice, 4.98);
+  assert.equal(nut.discountPercent, null);
+  assert.equal(nut.purchaseLimitText, 'XTRA: max. 3 Stück');
+  assert.equal(nut.planningStatus, 'ready');
+
+  const drink = assessOffer({
+    name: 'Pfanner',
+    text: '0,80 € sparen! ab 0,99 € Pfanner Saft-Getränk, versch. Sorten 1-l-Packg.',
+    priceText: '0,80 € sparen! 0,99 € 1,19 € 1,99 €',
+    packSizeText: '1-l-Packg.',
+    priceBlocks: [
+      { amountText: '0,99 €', label: 'Sonderpreis', conditions: '50% XTRA' },
+      { amountText: '1,19 €', label: 'Angebotspreis', conditions: 'Je' },
+      { amountText: '1,99 €', label: 'Regulärer Preis', conditions: '' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?page=5&productId=8f231b07-9f19-41be-8550-6f569ae0abcf'
+  }, kaufland, config, fixture.capturedAt).offer;
+  assert.equal(drink.price, 1.19);
+  assert.equal(drink.loyaltyPrice, 0.99);
+  assert.equal(drink.previousPrice, 1.99);
+  assert.equal(drink.discountAmount, 0.8);
+  assert.equal(drink.unitPrice, null);
+});
+
+test('Ein App-Preis darf für dieselbe Packung nicht gleich hoch oder höher sein', () => {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const kaufland = { key: 'Kaufland-Wuerzburg', store: 'Kaufland' };
+  for (const appPrice of ['1,99', '2,49']) {
+    const raw = {
+      name: 'Nuss-Nugat-Creme',
+      text: `Angebotspreis 1,99 €\nKaufland Card XTRA ${appPrice} €\n500 g`,
+      packSizeText: '500 g',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/nuss-nugat-creme'
+    };
+    const offer = assessOffer(raw, kaufland, config, fixture.capturedAt).offer;
+    assert.equal(offer.price, 1.99);
+    assert.equal(offer.loyaltyPrice, null);
+    assert.equal(offer.planningStatus, 'needs-review');
+  }
+
+  const offer = assessOffer(fixture.cards[0], market, config, fixture.capturedAt).offer;
+  const document = buildOffersDocument({
+    config,
+    results: [{ marketKey: market.key, categoryScoped: true, completenessStatus: 'complete', errors: [] }],
+    offers: [{ ...offer, marketLocationStatus: 'matched', loyaltyPrice: 1.19, loyaltyProgram: 'Lidl Plus' }],
+    fetchedAt: fixture.capturedAt
+  });
+  assert.match(validateOutputDocument(document).errors.join(' '), /App-Preis muss niedriger/);
+  document.offers[0].loyaltyPrice = 0.79;
+  assert.equal(validateOutputDocument(document).valid, true);
+});
+
 test('relative KaufDA-Gültigkeit wird anhand des Abrufzeitpunkts datiert', () => {
   assert.deepEqual(parseValidity('Endet morgen', '2026-11-20T07:00:00Z'), {
     validFrom: null, validUntil: '2026-11-21', status: 'relative', text: 'Endet morgen'
@@ -915,6 +1025,101 @@ test('Lidl-Kategorieangebote ohne eindeutige Packung bleiben sichtbar, aber revi
   assert.equal(ambiguousPiece.offer.pack, null);
   assert.equal(ambiguousPiece.offer.planningStatus, 'needs-review');
   assert.equal(otherMarket.offer.planningStatus, 'needs-review');
+});
+
+test('Lidl-Alternativgrößen 200/300 g und 185/195 g bleiben review-only', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const categoryConfig = { ...mergeConfig(), categoryScopeActive: true };
+  const cases = [
+    {
+      raw: {
+        name: 'Weichkäse',
+        text: '3,33 € Weichkäse 1 kg = 11.10 Gekühlt. Standardpackung: 200 g 300 g 3,33 € Preis pro Einheit: 1 kg = 11.10 Gültig bis 28.11',
+        productDescription: 'Gekühlt. Standardpackung: 200 g 300 g',
+        priceText: '3,33 €',
+        unitPriceText: 'Preis pro Einheit: 1 kg = 11.10',
+        sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=33&locality=Zellingen&productId=9f3657de-b7e9-45f9-a8d9-ac4d1cabf9c8',
+        sourceId: '9f3657de-b7e9-45f9-a8d9-ac4d1cabf9c8'
+      },
+      visibleDescription: 'Gekühlt. Standardpackung: 200 g 300 g',
+      pack: '200/300 g'
+    },
+    {
+      raw: {
+        name: 'Thunfisch Filets in eigenem Saft',
+        text: '0,30 € sparen! 0,99 € Thunfisch Filets in eigenem Saft 1,29 € 1 kg = 5.35/6.60 Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g 0,30 € sparen! 0,99 € 1,29 € Preis pro Einheit: 1 kg = 5.35/6.60 Gültig bis 28.11',
+        productDescription: 'Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g',
+        priceText: '0,30 € sparen! 0,99 € 1,29 €',
+        unitPriceText: 'Preis pro Einheit: 1 kg = 5.35/6.60',
+        sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=33&locality=Zellingen&productId=89a79e9b-c583-4e50-9e29-741a9676a78c',
+        sourceId: '89a79e9b-c583-4e50-9e29-741a9676a78c'
+      },
+      visibleDescription: 'Versch. Sorten, Je 185/195 g. Abtropfgewicht (Sorte Thunfisch-filets im eigenen Saft): 150 g',
+      pack: '185/195 g'
+    }
+  ];
+
+  for (const { raw, visibleDescription, pack: expectedPack } of cases) {
+    const result = assessOffer(raw, lidl, categoryConfig, '2026-11-28T11:22:24.147Z');
+    assert.equal(result.state, 'accepted');
+    assert.equal(result.offer.pack, expectedPack, raw.name);
+    assert.equal(result.offer.packSizeValue, null, raw.name);
+    assert.equal(result.offer.packSizeUnit, 'g', raw.name);
+    assert.equal(result.offer.fieldStatus.packSize, 'ambiguous', raw.name);
+    assert.equal(result.offer.evidence.packaging.visibleText, visibleDescription, raw.name);
+    assert.equal(result.offer.planningStatus, 'needs-review', raw.name);
+    assert.equal(result.offer.status, 'needs-review', raw.name);
+  }
+
+  const nonLidl = assessOffer(cases[1].raw, { ...lidl, key: 'Other-Market', store: 'Other' }, categoryConfig, '2026-11-28T11:22:24.147Z');
+  assert.equal(nonLidl.offer.pack, '195 g');
+  assert.equal(nonLidl.offer.planningStatus, 'ready');
+
+  for (const description of ['Standardpackung: 200 g 200 g', 'Je 200/200 g']) {
+    const repeatedSize = assessOffer({
+      name: 'Weichkäse', text: `Weichkäse\n${description}\n3,33 €`,
+      productDescription: description, priceText: '3,33 €', sourceUrl: lidl.url
+    }, lidl, categoryConfig);
+    assert.equal(repeatedSize.offer.pack, '200 g');
+    assert.equal(repeatedSize.offer.fieldStatus.packSize, 'visible');
+    assert.equal(repeatedSize.offer.planningStatus, 'ready');
+  }
+
+  const laterDescriptionSize = assessOffer({
+    name: 'Weichkäse', text: 'Weichkäse\nStandardpackung: 200 g. Hinweis: 300 g gibt es in einer anderen Variante.\n3,33 €',
+    productDescription: 'Standardpackung: 200 g. Hinweis: 300 g gibt es in einer anderen Variante.',
+    priceText: '3,33 €', sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  assert.equal(laterDescriptionSize.offer.pack, '200 g');
+  assert.equal(laterDescriptionSize.offer.fieldStatus.packSize, 'visible');
+  assert.equal(laterDescriptionSize.offer.planningStatus, 'ready');
+});
+
+test('Lidl übernimmt vertauschte Detailpreise nur bei eindeutig passendem Kartenbeleg', () => {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const raw = {
+    name: 'Smoothie',
+    text: '0,60 € sparen! ab 2,29 € Smoothie 2,89 € 1 l = 9.16 Versch. Sorten, Gekühlt. Je 250 ml 0,60 € sparen! 2,89 € 2,29 € Preis pro Einheit: 1 l = 9.16 Gültig bis 28.11',
+    priceText: '0,60 € sparen! 2,89 € 2,29 €',
+    cardPriceText: '0,60 € sparen! ab 2,29 € 2,89 €',
+    unitPriceText: 'Preis pro Einheit: 1 l = 9.16',
+    packSizeText: 'Je 250 ml',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/2959ec64-33b1-4d40-b18e-0276cf306d28?page=34&productId=d3a592ba-5a31-4c9d-a6b0-cd590f512531'
+  };
+  const capturedAt = '2026-11-28T11:24:09.861Z';
+  const confirmed = assessOffer(raw, market, config, capturedAt).offer;
+  assert.equal(confirmed.price, 2.29);
+  assert.equal(confirmed.previousPrice, 2.89);
+  assert.equal(confirmed.discountAmount, 0.6);
+  assert.equal(confirmed.unitPrice, 9.16);
+  assert.equal(confirmed.evidence.price.visibleText, raw.cardPriceText);
+  assert.equal(confirmed.planningStatus, 'ready');
+
+  const unconfirmed = assessOffer({ ...raw, cardPriceText: '0,60 € sparen! 2,29 € 3,89 €' }, market, config, capturedAt).offer;
+  assert.equal(unconfirmed.previousPrice, null);
+  assert.equal(unconfirmed.fieldStatus.price, 'needs-review');
+  assert.equal(unconfirmed.planningStatus, 'needs-review');
 });
 
 test('KaufDA-Detailfelder werden vollständig und semantisch getrennt übernommen', () => {
@@ -1176,6 +1381,163 @@ test('EDEKA lässt gemischte alkoholfreie Markenangebote nur zur Prüfung zu', (
 
   assert.equal(krombacher.classification.label, 'uncertain');
   assert.equal(krombacher.offer.planningStatus, 'needs-review');
+});
+
+test('EDEKA setzt widersprüchliche Sparbeträge nicht als sicheren Vorpreis ein', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const cases = [
+    {
+      name: 'Franken Brunnen',
+      productDescription: 'Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+      text: '3,00 € sparen! ab 4,99 € Franken Brunnen 7,99 € 1 l = 0,42 Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+      priceText: '3,00 € sparen! 4,99 € 5,99 € 7,99 €',
+      expectedCurrent: 4.99,
+      expectedParsedPrevious: 5.99,
+      expectedSaving: 3,
+      packSizeText: 'Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=5&locality=Zellingen&productId=373640df-ddc5-4eea-82f2-e6f57ce3d71e'
+    },
+    {
+      name: 'Salami',
+      productDescription: 'verschiedene Sorten, Ausgenommen Bio Salami 80 g. 50/80 g Packung',
+      text: '0,60 € sparen! ab 1,29 € Salami 2,29 € 1 kg = 16,13-25,80 verschiedene Sorten, Ausgenommen Bio Salami 80 g. 50/80 g Packung',
+      priceText: '0,60 € sparen! 1,29 € 1,69 € 2,29 €',
+      expectedCurrent: 1.29,
+      expectedParsedPrevious: 1.69,
+      expectedSaving: 0.6,
+      packSizeText: 'verschiedene Sorten, Ausgenommen Bio Salami 80 g. 50/80 g Packung',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=19&locality=Zellingen&productId=4148e5fc-1cc4-4fc0-9546-926b435e5f54'
+    }
+  ];
+
+  for (const item of cases) {
+    const parsed = parsePriceDetails(item.priceText);
+    assert.equal(parsed.currentPrice, item.expectedCurrent, item.name);
+    assert.equal(parsed.previousPrice, item.expectedParsedPrevious, item.name);
+    assert.equal(parsed.discountAmount, item.expectedSaving, item.name);
+    assert.notEqual(
+      Math.round((parsed.previousPrice - parsed.currentPrice) * 100),
+      Math.round(parsed.discountAmount * 100),
+      `${item.name} must have a visible arithmetic conflict`
+    );
+
+    const result = assessOffer({
+      cardId: item.sourceUrl.match(/productId=([^&]+)/)?.[1],
+      name: item.name,
+      text: item.text,
+      productDescription: item.productDescription,
+      priceText: item.priceText,
+      packSizeText: item.packSizeText,
+      sourceUrl: item.sourceUrl
+    }, edeka, categoryConfig, '2026-11-28T10:51:54.082Z');
+
+    assert.equal(result.offer.price, item.expectedCurrent, item.name);
+    assert.equal(result.offer.previousPrice, null, item.name);
+    assert.equal(result.offer.basePrice, null, item.name);
+    assert.equal(result.offer.discountAmount, item.expectedSaving, item.name);
+    assert.equal(result.offer.priceType, 'discount-with-current', item.name);
+    assert.equal(result.offer.fieldStatus.price, 'needs-review', item.name);
+    assert.equal(result.offer.evidence.price.reconciliationStatus, 'needs-review', item.name);
+    assert.match(result.offer.evidence.price.reviewReason, /Sparbetrag/);
+    assert.equal(result.offer.planningStatus, 'needs-review', item.name);
+  }
+
+  const consistentDiscount = assessOffer({
+    name: 'Salami',
+    text: '0,30 € sparen! 1,19 € 1,49 € Salami 80 g Packung',
+    productDescription: '80 g Packung',
+    priceText: '0,30 € sparen! 1,19 € 1,49 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:51:54.082Z');
+  assert.equal(consistentDiscount.offer.previousPrice, 1.49);
+  assert.equal(consistentDiscount.offer.basePrice, 1.49);
+  assert.equal(consistentDiscount.offer.planningStatus, 'ready');
+});
+
+test('EDEKA löst mehrdeutige Kachelpreise anhand gelabelter Detailblöcke auf', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const raw = {
+    name: 'Franken Brunnen Mineralwasser',
+    productDescription: 'Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+    text: '3,00 € sparen! ab 4,99 € Franken Brunnen 7,99 € 1 l = 0,42 Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+    priceText: '3,00 € sparen! 4,99 € 5,99 € 7,99 €',
+    cardPriceText: '3,00 € sparen! ab 4,99 € 7,99 €',
+    packSizeText: '12 x 1 Liter Kasten',
+    priceBlocks: [
+      { amountText: '4,99 €', label: 'Angebotspreis', conditions: 'ab 2 Kästen 1 l = 0,42 €', unitPriceText: '1 l = 0,42 €' },
+      { amountText: '5,99 €', label: 'Angebotspreis', conditions: '1 l = 0,50 €', unitPriceText: '1 l = 0,50 €' },
+      { amountText: '7,99 €', label: 'Regulärer Preis', conditions: '.G. = 7,99' }
+    ],
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=5&locality=Zellingen&productId=373640df-ddc5-4eea-82f2-e6f57ce3d71e'
+  };
+  const withDetails = assessOffer(raw, edeka, categoryConfig, '2026-11-28T10:51:54.082Z').offer;
+
+  assert.equal(withDetails.price, 4.99);
+  assert.equal(withDetails.previousPrice, 7.99);
+  assert.equal(withDetails.basePrice, 7.99);
+  assert.equal(withDetails.discountAmount, 3);
+  assert.equal(withDetails.priceLabel, 'Angebotspreis');
+  assert.equal(withDetails.unitPrice, 0.42);
+  assert.equal(withDetails.minimumPurchaseQuantity, 2);
+  assert.equal(withDetails.minimumPurchaseUnit, 'Kästen');
+  assert.equal(withDetails.minimumPurchaseText, 'ab 2 Kästen');
+  assert.equal(withDetails.fieldStatus.price, 'visible');
+  assert.equal(withDetails.packCount, 12);
+  assert.equal(withDetails.packSizeUnit, 'l');
+  assert.equal(withDetails.planningStatus, 'needs-review');
+
+  const forcedReady = {
+    ...withDetails,
+    marketLocationStatus: 'matched',
+    planningStatus: 'ready',
+    reviewStatus: 'ready',
+    status: 'verified'
+  };
+  const invalidReadyDocument = buildOffersDocument({
+    config: categoryConfig,
+    results: [{ marketKey: edeka.key, categoryScoped: true, completenessStatus: 'complete', errors: [] }],
+    offers: [forcedReady],
+    fetchedAt: '2026-11-28T10:51:54.082Z'
+  });
+  assert.match(validateOutputDocument(invalidReadyDocument).errors.join(' '), /Mindestabnahme/);
+
+  const withoutDetails = assessOffer({ ...raw, priceBlocks: undefined }, edeka, categoryConfig, '2026-11-28T10:51:54.082Z').offer;
+  assert.equal(withoutDetails.price, 4.99);
+  assert.equal(withoutDetails.previousPrice, null);
+  assert.equal(withoutDetails.basePrice, null);
+  assert.equal(withoutDetails.fieldStatus.price, 'needs-review');
+  assert.equal(withoutDetails.planningStatus, 'needs-review');
+});
+
+test('Kaufland-Kacheln behalten widersprüchliche Sparpreise zur Prüfung', () => {
+  const kaufland = {
+    key: 'Kaufland-Wuerzburg',
+    label: 'Kaufland Würzburg',
+    store: 'Kaufland',
+    collectionMode: 'tiles',
+    interpretationProfile: 'kaufland-v1',
+    requirePackForPlanning: true,
+    requireFoodConfidenceForPlanning: true
+  };
+  const categoryConfig = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const result = assessOffer({
+    name: 'Nuss-Nugat-Creme',
+    text: '1,50 € sparen! ab 1,99 € Nuss-Nugat-Creme 3,99 € (1 kg = 3.98) cremig-nussiger Brotaufstrich je 500-g-Glas 1,50 € sparen! 1,99 € 2,49 € 3,99 € Preis pro Einheit: (1 kg = 3.98) Gültig bis 28.11',
+    priceText: '1,50 € sparen! 1,99 € 2,49 € 3,99 €',
+    packSizeText: '500-g-Glas',
+    unitPriceText: 'Preis pro Einheit: (1 kg = 3.98)',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/be566747-bcb2-4d8c-9da8-4873f6d738bd?page=59&productId=2f5e2010-1e0f-467e-ae97-1fd864f2f18d'
+  }, kaufland, categoryConfig, '2026-11-28T11:36:06Z');
+  assert.equal(result.offer.price, 1.99);
+  assert.equal(result.offer.previousPrice, null);
+  assert.equal(result.offer.discountAmount, 1.5);
+  assert.equal(result.offer.unitPrice, 3.98);
+  assert.equal(result.offer.fieldStatus.price, 'needs-review');
+  assert.equal(result.offer.planningStatus, 'needs-review');
 });
 
 test('Fixturekarten liefern PWA-kompatible Felder und Status', () => {

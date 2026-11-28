@@ -14,7 +14,8 @@ export const PUBLISHED_OFFER_FIELDS = Object.freeze([
   'market', 'marketKey', 'store', 'marketLocationStatus',
   'price', 'priceLabel', 'currency', 'discountAmount', 'discountPercent', 'basePrice', 'previousPrice', 'priceType',
   'priceBasis', 'activationRequired', 'pack', 'packSize', 'packSizeValue', 'packSizeUnit', 'packCount',
-  'loyaltyPrice', 'loyaltyProgram', 'loyaltyActivationRequired', 'loyaltyPointsRequired', 'minimumPurchaseAmount', 'purchaseLimitText',
+  'loyaltyPrice', 'loyaltyProgram', 'loyaltyActivationRequired', 'loyaltyPointsRequired',
+  'minimumPurchaseAmount', 'minimumPurchaseQuantity', 'minimumPurchaseUnit', 'minimumPurchaseText', 'purchaseLimitText',
   'unitPrice', 'unitPriceUnit', 'unitPriceText',
   'validFrom', 'validUntil', 'validTo',
   'sourceUrl', 'sourcePage', 'source', 'sourceId', 'capturedAt', 'fetchedAt', 'evidence',
@@ -170,6 +171,12 @@ const kaufdaCalendarDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/
 function isOutsideOfferPeriod(offer, date) {
   const end = offer.validUntil ?? offer.validTo;
   return (end != null && end < date) || (offer.validFrom != null && offer.validFrom > date);
+}
+
+function hasConflictingAppPrice(price, loyaltyPrice, activationRequired) {
+  // Bei einem reinen Couponpreis fehlt ein separater Preis ohne App.
+  return activationRequired !== true && Number.isFinite(price) && Number.isFinite(loyaltyPrice)
+    && Math.round(loyaltyPrice * 100) >= Math.round(price * 100);
 }
 
 function stableHash(value) {
@@ -373,6 +380,16 @@ function isKauflandMarket(market = {}) {
     || /kaufland/i.test(`${market.key ?? ''} ${market.store ?? ''} ${market.label ?? ''}`);
 }
 
+function chooseLidlCardPriceDetails(detailPrice, cardPriceText) {
+  if (!cardPriceText || !Number.isFinite(detailPrice.currentPrice) || !Number.isFinite(detailPrice.previousPrice)
+      || detailPrice.currentPrice <= detailPrice.previousPrice || !Number.isFinite(detailPrice.discountAmount)) return null;
+  const cardPrice = parsePriceDetails(cardPriceText);
+  if (cardPrice.currentPrice !== detailPrice.previousPrice || cardPrice.previousPrice !== detailPrice.currentPrice
+      || cardPrice.discountAmount !== detailPrice.discountAmount) return null;
+  const difference = Math.round(cardPrice.previousPrice * 100) - Math.round(cardPrice.currentPrice * 100);
+  return difference === Math.round(cardPrice.discountAmount * 100) ? cardPrice : null;
+}
+
 function parseKauflandConditions(value = '') {
   const text = normalizeText(value);
   const xtraPricePatterns = [
@@ -406,6 +423,54 @@ function parseKauflandConditions(value = '') {
     minimumPurchaseAmount: minimum ? parseGermanNumber(minimum[1]) : null,
     purchaseLimitText: limit ? normalizeText(limit[0]) : null,
     discountPercent: percent ? Number(percent[1]) : null
+  };
+}
+
+function readKauflandAppPrices(blocks) {
+  if (!Array.isArray(blocks) || blocks.length !== 3) return null;
+  const rows = blocks.map((block) => ({
+    ...block,
+    amount: parsePrice(block.amountText),
+    xtra: /\bxtra\b/i.test(block.conditions) && !/\bohne\s+(?:kaufland\s+card\s+)?xtra\b/i.test(block.conditions)
+  }));
+  if (!rows.every((row) => Number.isFinite(row.amount))) return null;
+  const standard = rows.find((row) => !row.xtra && /^(?:angebotspreis|aktionspreis)$/i.test(row.label)
+    && !/\b(?:ab|mindestens|maximal)\s+\d/i.test(row.conditions));
+  const app = rows.find((row) => row.xtra && /^(?:sonderpreis|angebotspreis|aktionspreis)$/i.test(row.label));
+  const regular = rows.find((row) => !row.xtra && /^regulärer preis$/i.test(row.label));
+  return standard && app && regular ? { standard, app, regular } : null;
+}
+
+function readEdekaLabeledPriceBlocks(blocks, priceText = '') {
+  if (!Array.isArray(blocks) || blocks.length < 2) return null;
+  const rows = blocks.map((block) => ({
+    ...block,
+    amount: parsePrice(block.amountText),
+    normalizedLabel: normalizeText(block.label).toLocaleLowerCase('de-DE'),
+    conditions: normalizeText(block.conditions ?? '')
+  }));
+  if (!rows.every((row) => Number.isFinite(row.amount))) return null;
+  const regularRows = rows.filter((row) => row.normalizedLabel === 'regulärer preis');
+  const offerRows = rows.filter((row) => ['angebotspreis', 'aktionspreis', 'sonderpreis'].includes(row.normalizedLabel));
+  if (regularRows.length !== 1 || offerRows.length < 1) return null;
+
+  const cardPrice = parsePriceDetails(priceText);
+  if (!Number.isFinite(cardPrice.currentPrice)) return null;
+  const selectedRows = offerRows.filter((row) => row.amount === cardPrice.currentPrice);
+  if (selectedRows.length !== 1) return null;
+  const selected = selectedRows[0];
+  const regular = regularRows[0];
+  const minimum = selected.conditions.match(/\b(?:ab|mindestens|min\.?)\s*(\d+)\s*(kästen?|kisten?|flaschen?|packungen?|kartons?|dosen?|gläser?|stück|stk\.?)\b/i);
+  return {
+    currentPrice: selected.amount,
+    previousPrice: regular.amount,
+    discountAmount: cardPrice.discountAmount,
+    type: cardPrice.discountAmount == null ? 'offer-with-previous' : 'discount-with-previous',
+    priceLabel: selected.label,
+    unitPriceText: selected.unitPriceText ?? '',
+    minimumPurchaseQuantity: minimum ? Number(minimum[1]) : null,
+    minimumPurchaseUnit: minimum ? minimum[2] : null,
+    minimumPurchaseText: minimum ? minimum[0] : null
   };
 }
 
@@ -644,6 +709,55 @@ export function parsePackSize(value, { fallbackUnit = null } = {}) {
   };
 }
 
+function parseLidlAlternativePackSize(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  const slashAlternative = normalized.match(/\b(\d+(?:[,.]\d+)?)\s*(?:(kg|g|l|ml|cl|stück|stk\.?)\s*)?\/\s*(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|cl|stück|stk\.?)\b/i);
+  if (slashAlternative) {
+    const unit = slashAlternative[4].replace('.', '').toLocaleLowerCase('de-DE');
+    const leftUnit = slashAlternative[2]?.replace('.', '').toLocaleLowerCase('de-DE');
+    const variants = [slashAlternative[1], slashAlternative[3]].map(parseGermanNumber);
+    if ((!leftUnit || leftUnit === unit) && variants.every(Number.isFinite) && variants[0] !== variants[1]) {
+      return {
+        text: `${slashAlternative[1]}/${slashAlternative[3]} ${unit}`,
+        value: null,
+        unit,
+        count: null,
+        itemValue: null,
+        itemUnit: unit,
+        ambiguous: true,
+        variants
+      };
+    }
+  }
+
+  const standardPack = normalized.match(/\bstandardpackung\s*:?\s*((?:\d+(?:[,.]\d+)?\s*(?:kg|g|l|ml|cl|stück|stk\.?)\s+)+\d+(?:[,.]\d+)?\s*(?:kg|g|l|ml|cl|stück|stk\.?)\b)/i)?.[1];
+  if (standardPack) {
+    const quantities = [...standardPack.matchAll(/(\d+(?:[,.]\d+)?)\s*(kg|g|l|ml|cl|stück|stk\.?)\b/gi)];
+    const units = [...new Set(quantities.map((match) => match[2].replace('.', '').toLocaleLowerCase('de-DE')))];
+    const values = [...new Set(quantities.map((match) => parseGermanNumber(match[1])))];
+    if (quantities.length > 1 && units.length === 1 && values.length > 1) {
+      const unit = units[0];
+      const variants = values;
+      if (variants.every(Number.isFinite)) {
+        return {
+          text: `${quantities.map((match) => match[1]).join('/')} ${unit}`,
+          value: null,
+          unit,
+          count: null,
+          itemValue: null,
+          itemUnit: unit,
+          ambiguous: true,
+          variants
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export function parseUnitPrice(value) {
   const text = normalizeText(value);
   const perHundred = text.match(/(?:je|pro)\s+100\s*(g|ml)\s*(?:=|:)??\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:[,.]\d{1,2})?)\s*€/i);
@@ -750,6 +864,11 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const imageOcrBlocksPlanning = (imageOcrRequired && config.imageOcr?.blockPlanning === true)
     || (market.collectionMode === 'prospect' && imageOcrRequired);
   const imageProductStatus = raw.imageProductStatus ?? (imageOcrRequired ? 'missing' : 'not-required');
+  const kaufland = isKauflandMarket(market);
+  const appPriceBlocks = kaufland ? readKauflandAppPrices(raw.priceBlocks) : null;
+  const edekaPriceBlocks = market.key === 'Edeka-Zellingen'
+    ? readEdekaLabeledPriceBlocks(raw.priceBlocks, raw.cardPriceText || raw.priceText || '')
+    : null;
   const visibleName = chooseName(lines, raw.name);
   const name = visibleName ?? (raw.imageProductStatus === 'verified' ? chooseName([], raw.imageProductName ?? '') : null);
   const reportedPrice = raw.price == null ? null : Number(raw.price);
@@ -761,12 +880,18 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       || (market.normalizeLiterPackUnit === true && /\b\d+(?:[,.]\d+)?\s*liter\b/i.test(line)))
       && !UNIT_PRICE_LINE_RE.test(line))
   ].filter(Boolean).join('\n');
-  const unit = raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE)) : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
+  const unit = appPriceBlocks ? parseUnitPrice(appPriceBlocks.standard.unitPriceText)
+    : edekaPriceBlocks?.unitPriceText ? parseUnitPrice(edekaPriceBlocks.unitPriceText)
+    : raw.unitPrice == null ? parseUnitPrice(raw.unitPriceText || findLine(lines, UNIT_PRICE_LINE_RE))
+      : { amount: Number(raw.unitPrice), unit: raw.unitPriceUnit ?? null, text: raw.unitPriceText ?? null };
   const packInput = packEvidenceText || findPackSizeText(raw.text ?? text);
   const normalizedPackInput = market.normalizeLiterPackUnit === true
     ? packInput.replace(/\bliter\b/gi, 'l')
     : packInput;
-  const visiblePack = parsePackSize(normalizedPackInput);
+  const lidlPackAlternatives = market.key === 'Lidl-Zellingen'
+    ? parseLidlAlternativePackSize(normalizedPackInput)
+    : null;
+  const visiblePack = lidlPackAlternatives ?? parsePackSize(normalizedPackInput);
   const canInferPackUnit = market.inferPackUnitFromUnitPrice === true
     && !visiblePack.text
     && ['kg', 'g', 'l', 'ml', 'cl'].includes(unit.unit)
@@ -784,7 +909,6 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       : canInferBarePiece
         ? parsePackSize('1 Stück')
       : visiblePack;
-  const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
     loyaltyPrice: null,
     loyaltyPriceText: null,
@@ -795,12 +919,53 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     purchaseLimitText: null,
     discountPercent: null
   };
+  if (appPriceBlocks) {
+    const appConditions = parseKauflandConditions(appPriceBlocks.app.conditions);
+    const standardConditions = parseKauflandConditions(appPriceBlocks.standard.conditions);
+    Object.assign(kauflandConditions, {
+      ...standardConditions,
+      loyaltyPrice: appPriceBlocks.app.amount,
+      loyaltyProgram: 'Kaufland Card XTRA',
+      loyaltyActivationRequired: appConditions.loyaltyActivationRequired,
+      loyaltyPointsRequired: appConditions.loyaltyPointsRequired,
+      purchaseLimitText: standardConditions.purchaseLimitText
+        ?? (appConditions.purchaseLimitText ? `XTRA: ${appConditions.purchaseLimitText}` : null)
+    });
+  }
   const priceTextForParsing = kaufland && kauflandConditions.loyaltyPriceText
     ? text.replace(kauflandConditions.loyaltyPriceText, ' ')
     : market.collectionMode === 'prospect'
       ? raw.priceText ?? ''
       : raw.priceText || lines.join('\n');
-  const priceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  let detailPrice = edekaPriceBlocks ?? raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  if (appPriceBlocks) {
+    const currentPrice = appPriceBlocks.standard.amount;
+    const previousPrice = appPriceBlocks.regular.amount;
+    const saving = detailPrice.discountAmount;
+    const difference = Math.round(previousPrice * 100) - Math.round(currentPrice * 100);
+    const discountAmount = Number.isFinite(saving) && difference === Math.round(saving * 100) ? saving : null;
+    detailPrice = {
+      currentPrice, previousPrice, discountAmount,
+      type: discountAmount == null ? 'offer-with-previous' : 'discount-with-previous'
+    };
+  }
+  const cardPrice = market.key === 'Lidl-Zellingen' ? chooseLidlCardPriceDetails(detailPrice, raw.cardPriceText) : null;
+  const parsedPriceDetails = cardPrice ?? detailPrice;
+  const { currentPrice, previousPrice, discountAmount } = parsedPriceDetails;
+  const edekaMinimumPurchaseBlocksPlanning = market.key === 'Edeka-Zellingen'
+    && Number.isFinite(edekaPriceBlocks?.minimumPurchaseQuantity)
+    && edekaPriceBlocks.minimumPurchaseQuantity > 1;
+  const checkDiscountReconciliation = ['Edeka-Zellingen', 'Lidl-Zellingen'].includes(market.key)
+    || (kaufland && market.collectionMode === 'tiles');
+  const priceArithmeticConflict = checkDiscountReconciliation
+    && [currentPrice, previousPrice, discountAmount].every(Number.isFinite)
+    && Math.round(previousPrice * 100) - Math.round(currentPrice * 100) !== Math.round(discountAmount * 100);
+  const priceDetails = priceArithmeticConflict
+    ? { ...parsedPriceDetails, previousPrice: null, type: 'discount-with-current' }
+    : parsedPriceDetails;
+  const basePrice = priceArithmeticConflict
+    ? null
+    : raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice);
   const explicitActivation = raw.activationRequired ?? (/(?:gutschein|coupon|rabatt)/i.test(text) && /(?:aktivieren|aktivierung erforderlich)/i.test(text));
   // Ein sichtbarer Standardpreis bleibt verwendbar, wenn nur der zusätzliche
   // XTRA-Preis erst nach Coupon-/Punkteeinlösung gilt.
@@ -819,6 +984,11 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       : explicitWeightBasis && unit.unit === '100 g'
         ? unit.amount
         : null;
+  const loyaltyPriceConflict = hasConflictingAppPrice(price, kauflandConditions.loyaltyPrice, activationRequired);
+  const loyaltyPrice = loyaltyPriceConflict ? null : kauflandConditions.loyaltyPrice;
+  const priceReviewReason = loyaltyPriceConflict
+    ? 'Der zugeordnete App-Preis ist nicht niedriger als der Preis ohne App.'
+    : priceArithmeticConflict ? 'Der sichtbare Sparbetrag passt nicht zum zugeordneten Vorpreis.' : null;
   const priceBasis = activationRequired
     ? 'conditional-coupon'
     : pack.count > 1
@@ -875,7 +1045,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name ? (imageOcrRequired && imageProductStatus !== 'verified' ? 'image-unverified' : 'visible') : 'missing',
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
-    price: activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
+    price: priceReviewReason || activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
     packSize: canInferPackUnit || canInferSinglePiece || canInferBarePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
@@ -884,15 +1054,22 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const evidence = {
     visibleText: normalizeText(raw.text ?? text).slice(0, 1200) || null,
     price: {
-      visibleText: normalizeText(raw.priceText ?? '').slice(0, 400) || null,
+      visibleText: normalizeText((cardPrice ? raw.cardPriceText : raw.priceText) ?? '').slice(0, 400) || null,
       currentPrice: Number.isFinite(price) ? price : null,
       previousPrice: priceDetails.previousPrice,
+      ...(priceReviewReason ? {
+        reconciliationStatus: 'needs-review',
+        reviewReason: priceReviewReason
+      } : {}),
       discountPercent: kauflandConditions.discountPercent,
-      loyaltyPrice: kauflandConditions.loyaltyPrice,
+      loyaltyPrice,
       loyaltyProgram: kauflandConditions.loyaltyProgram,
       loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
       loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
       minimumPurchaseAmount: kauflandConditions.minimumPurchaseAmount,
+      minimumPurchaseQuantity: edekaPriceBlocks?.minimumPurchaseQuantity ?? null,
+      minimumPurchaseUnit: edekaPriceBlocks?.minimumPurchaseUnit ?? null,
+      minimumPurchaseText: edekaPriceBlocks?.minimumPurchaseText ?? null,
       purchaseLimitText: kauflandConditions.purchaseLimitText,
       unitPrice: Number.isFinite(unit.amount) ? unit.amount : null,
       unitPriceUnit: unit.unit ?? null,
@@ -945,6 +1122,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   if (!name) reasons.push('Produktname fehlt.');
   if (!Number.isFinite(price)) reasons.push('Angebotspreis fehlt oder ist ungültig.');
   if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
+  if (priceReviewReason) reasons.push(priceReviewReason);
   if (activationRequired) reasons.push('Rabatt erfordert eine Aktivierung; der Preis ist nicht ohne Weiteres verfügbar.');
   if (weightUnitUnknown) reasons.push('Gewichtsabhängiger Thekenpreis ohne erkennbare Bezugsmenge.');
   if (recognized && classification.label === 'nonfood') {
@@ -966,7 +1144,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       recognized,
       name,
       price: Number.isFinite(price) ? price : null,
-      basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
+      basePrice,
       previousPrice: priceDetails.previousPrice,
       discountAmount: priceDetails.discountAmount,
       discountPercent: kauflandConditions.discountPercent,
@@ -1010,7 +1188,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const foodConfidenceBlocksPlanning = market.requireFoodConfidenceForPlanning === true
     && (classification.label !== 'food' || classification.confidence !== 'high');
   const planningReady = Boolean(
-    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
+    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && !priceReviewReason && !edekaMinimumPurchaseBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
     && classification.label !== 'nonfood'
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
@@ -1025,19 +1203,22 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name,
     productDescription,
     price,
-    priceLabel: raw.priceLabel || findPriceLabel(lines),
-    basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
+    priceLabel: edekaPriceBlocks?.priceLabel ?? appPriceBlocks?.standard.label ?? (raw.priceLabel || findPriceLabel(lines)),
+    basePrice,
     previousPrice: priceDetails.previousPrice,
     discountAmount: priceDetails.discountAmount,
     discountPercent: kauflandConditions.discountPercent,
     priceType: priceDetails.type,
     priceBasis,
     activationRequired: Boolean(activationRequired),
-    loyaltyPrice: kauflandConditions.loyaltyPrice,
+    loyaltyPrice,
     loyaltyProgram: kauflandConditions.loyaltyProgram,
     loyaltyActivationRequired: kauflandConditions.loyaltyActivationRequired,
     loyaltyPointsRequired: kauflandConditions.loyaltyPointsRequired,
     minimumPurchaseAmount: kauflandConditions.minimumPurchaseAmount,
+    minimumPurchaseQuantity: edekaPriceBlocks?.minimumPurchaseQuantity ?? null,
+    minimumPurchaseUnit: edekaPriceBlocks?.minimumPurchaseUnit ?? null,
+    minimumPurchaseText: edekaPriceBlocks?.minimumPurchaseText ?? null,
     purchaseLimitText: kauflandConditions.purchaseLimitText,
     planningStatus: planningReady ? 'ready' : 'needs-review',
     currency: raw.currency ?? 'EUR',
@@ -1092,8 +1273,9 @@ export function dedupeOffers(offers = []) {
   });
 }
 
-async function readKaufdaSnapshot(page) {
-  return page.evaluate(() => {
+async function readKaufdaSnapshot(page, market = {}) {
+  const isKaufland = isKauflandMarket(market);
+  const snapshot = await page.evaluate((kaufland) => {
     const bodyText = document.body?.innerText ?? '';
     const bodyLines = bodyText.split(/\n+/).map((line) => line.trim()).filter(Boolean);
     const locationText = bodyLines.find((line) => /\bkm\b/i.test(line) && /,/.test(line)) || null;
@@ -1111,6 +1293,44 @@ async function readKaufdaSnapshot(page) {
       return description.join(' ').replace(/\s+/g, ' ').trim();
     };
     const findPriceLabel = (lines) => lines.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis|ab\s+\d)/i.test(line.trim())) || null;
+
+    if (kaufland) {
+      // KaufDA renders Kaufland offers as productId anchors directly inside the offers CSS grid.
+      // Keep each anchor's own text; ancestors include prices and names from neighboring cards.
+      const grids = [...document.querySelectorAll('div.grid')];
+      const gridIndexes = new Map(grids.map((grid, index) => [grid, index]));
+      const gridRecords = [...document.querySelectorAll('a[href*="productId"]')].map((anchor) => {
+        const parent = anchor.parentElement;
+        const parentGridId = parent && gridIndexes.has(parent) && getComputedStyle(parent).display === 'grid'
+          ? gridIndexes.get(parent)
+          : null;
+        const rect = anchor.getBoundingClientRect();
+        const image = anchor.querySelector('img');
+        const imageSource = image?.currentSrc || image?.src || '';
+        const imageUrl = imageSource && /^https?:\/\//i.test(imageSource)
+          && !/(logo|einkaufsliste|hinzufügen|placeholder|fallback)/i.test(`${image?.alt || ''} ${image?.title || ''} ${imageSource}`)
+          ? imageSource
+          : null;
+        let productId = null;
+        try { productId = new URL(anchor.href).searchParams.get('productId'); } catch (_) { /* malformed link target */ }
+        return {
+          gridId: parentGridId,
+          isDirectGridChild: parentGridId != null,
+          isRendered: rect.width > 0 && rect.height > 0,
+          anchorClass: String(anchor.className ?? ''),
+          productId,
+          sourceUrl: anchor.href,
+          text: (anchor.innerText ?? '').trim(),
+          name: anchor.querySelector('[data-testid*="name"], [data-testid*="title"], [class*="offer-name"], [class*="product-name"], h2, h3, h4')?.textContent?.trim()
+            || image?.alt?.trim()
+            || image?.title?.trim()
+            || null,
+          imageUrl
+        };
+      });
+      return { bodyText, pageUrl: location.href, locationText, kauflandGridRecords: gridRecords };
+    }
+
     const selectors = [
       '[data-testid*="offer"]', '[data-testid*="Offer"]',
       '[data-testid*="product"]', '[data-testid*="Product"]',
@@ -1185,7 +1405,74 @@ async function readKaufdaSnapshot(page) {
       });
     }
     return { bodyText, pageUrl: location.href, locationText, cards };
-  });
+  }, isKaufland);
+  if (!isKaufland) return snapshot;
+  return { ...snapshot, cards: extractKauflandGridCards(snapshot.kauflandGridRecords) };
+}
+
+export function extractKauflandGridCards(records = []) {
+  const isOfferCardClass = (value) => {
+    const classes = new Set(String(value ?? '').split(/\s+/).filter(Boolean));
+    return classes.has('rounded-lg') && classes.has('border') && classes.has('cursor-pointer') && classes.has('flex');
+  };
+  const validRecords = records.filter((record) => record
+    && Number.isInteger(record.gridId)
+    && record.isDirectGridChild === true
+    && record.isRendered === true
+    && isOfferCardClass(record.anchorClass)
+    && typeof record.productId === 'string'
+    && record.productId.trim() !== ''
+    && record.productId !== 'notProvided');
+  const uniqueIdsByGrid = new Map();
+  for (const record of validRecords) {
+    const ids = uniqueIdsByGrid.get(record.gridId) ?? new Set();
+    ids.add(record.productId);
+    uniqueIdsByGrid.set(record.gridId, ids);
+  }
+  // Detail panels and related-offer widgets can contain their own links; the offers grid is the largest productId grid.
+  const selectedGridId = [...uniqueIdsByGrid.entries()]
+    .sort((left, right) => right[1].size - left[1].size)[0]?.[0];
+  if (selectedGridId == null) return [];
+
+  const packLineRe = /\b(?:\d+\s*[x×]\s*)?\d+(?:[,.]\d+)?\s*[- ]?(?:kg|g|l|ml|cl|stück|stk\.?|pack(?:ung)?|portion(?:en)?)(?:\s*[- ]?(?:packg?\.?|packung))?\b/i;
+  const unitLineRe = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|€\s*\/\s*(?:100\s*(?:g|ml)|kg|g|l|ml|cl|stück|stk\.?|liter)|je\s+(?:100\s*(?:g|ml)|kg|g|l|ml|cl|liter|stück))/i;
+  const seenProductIds = new Set();
+  const cards = [];
+  for (const record of validRecords) {
+    if (record.gridId !== selectedGridId || seenProductIds.has(record.productId)) continue;
+    seenProductIds.add(record.productId);
+    const text = String(record.text ?? '').trim();
+    const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    const findDescription = () => {
+      const start = lines.findIndex((line) => packLineRe.test(line) && !unitLineRe.test(line));
+      if (start < 0) return '';
+      const description = [lines[start]];
+      for (const line of lines.slice(start + 1)) {
+        if (/€/.test(line) || unitLineRe.test(line) || /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) break;
+        if (/^(?:produktbeschreibung|preisdetails|angebotspreis|preis\s+pro\s+einheit)$/i.test(line)) break;
+        description.push(line);
+      }
+      return description.join(' ').replace(/\s+/g, ' ').trim();
+    };
+    const productDescription = findDescription();
+    const priceText = lines.filter((line) => /€/.test(line) && !unitLineRe.test(line)).join(' ');
+    const packSizeText = productDescription || lines.find((line) => packLineRe.test(line) && !unitLineRe.test(line)) || '';
+    cards.push({
+      cardId: record.productId,
+      cardKey: record.productId,
+      sourceUrl: record.sourceUrl,
+      imageUrl: record.imageUrl || null,
+      text,
+      name: record.name || null,
+      productDescription,
+      priceText,
+      priceLabel: lines.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis|ab\s+\d)/i.test(line)) || null,
+      packSizeText,
+      unitPriceText: lines.find((line) => /pro Einheit|kg\s*=|l\s*=|kg[- ]?Preis|l[- ]?Preis|\/kg|\/l/i.test(line)) || '',
+      validityText: lines.find((line) => /gültig|endet|noch\s+\d+\s+tage/i.test(line)) || ''
+    });
+  }
+  return cards;
 }
 
 function productIdFromUrl(value) {
@@ -1239,13 +1526,31 @@ async function readKaufdaDetailSnapshot(page, sourceUrl, detailConfig) {
         : '';
       const priceSection = lines.slice(priceStart >= 0 ? priceStart + 1 : 0, priceEnd);
       const unitPriceLine = /(?:pro\s+einheit|(?:kg|g|l|ml|cl|stück|stk\.?)\s*(?:=|[- ]?preis)|\/\s*(?:kg|g|l|ml|cl|stück|stk\.?))/i;
+      const priceHeading = [...document.querySelectorAll('div.text-lg.font-bold')]
+        .find((element) => /^preisdetails$/i.test(element.innerText.trim()));
+      // The title sits inside the accordion header; the price rows are in the
+      // sibling of that header, not in a sibling of the title itself.
+      const priceAccordion = priceHeading?.parentElement?.nextElementSibling;
+      const priceBlocks = [...(priceAccordion?.children ?? [])]
+        .filter((block) => block.getBoundingClientRect().height > 0)
+        .map((block) => {
+          const [row, ...context] = [...block.children];
+          const [amount, label] = [...(row?.children ?? [])];
+          const terms = context.map((element) => element.innerText.trim());
+          return {
+            amountText: amount?.innerText.trim() ?? '',
+            label: label?.innerText.trim() ?? '',
+            conditions: terms.join(' '),
+            unitPriceText: terms.find((term) => unitPriceLine.test(term)) ?? ''
+          };
+        });
       const priceLines = priceSection.filter((line) => /€/.test(line) && !unitPriceLine.test(line));
       const discountLines = lines.filter((line) => /€/.test(line) && /sparen/i.test(line));
       const priceText = [...new Set([...discountLines, ...priceLines])].join(' ');
       const unitPriceText = priceSection.find((line) => unitPriceLine.test(line)) || '';
       const priceLabel = priceSection.find((line) => /^(?:angebotspreis|aktionspreis|sonderpreis)$/i.test(line)) || null;
       const validityText = lines.find((line) => /(?:gültig|endet|noch\s+\d+\s+tage)/i.test(line)) || '';
-      return { productDescription, priceText, priceLabel, unitPriceText, validityText };
+      return { productDescription, priceText, priceLabel, priceBlocks, unitPriceText, validityText };
     });
     return { skipped: false, ...fields };
   } catch (error) {
@@ -1313,6 +1618,8 @@ async function enrichCardsFromDetails(page, cards, market, config, fetchedAt) {
           ...raw,
           productDescription: detail.productDescription || raw.productDescription || '',
           priceText: detail.priceText || raw.priceText || '',
+          cardPriceText: raw.priceText,
+          priceBlocks: detail.priceBlocks,
           priceLabel: detail.priceLabel ?? raw.priceLabel ?? null,
           unitPriceText: detail.unitPriceText || raw.unitPriceText || '',
           validityText: detail.validityText || raw.validityText || '',
@@ -1369,7 +1676,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
   };
 
   while (pass < scroll.maxPasses) {
-    addSnapshot(await readKaufdaSnapshot(page));
+    addSnapshot(await readKaufdaSnapshot(page, market));
     const loadedCardCount = rawCards.size;
     if (expectedCountKind === 'cards' && expectedCount > 0 && loadedCardCount >= expectedCount) break;
     const progress = await page.evaluate(({ stepPx }) => {
@@ -1390,7 +1697,7 @@ export async function collectOffersFromPage(page, market, configInput = {}, expe
     pass += 1;
   }
 
-  addSnapshot(await readKaufdaSnapshot(page));
+  addSnapshot(await readKaufdaSnapshot(page, market));
   const fetchedAt = new Date().toISOString();
   const visibleLocation = lastSnapshot.locationText ?? null;
   const expectedLocation = market.location ?? config.location;
@@ -2032,6 +2339,8 @@ export function validateOutputDocument(document, { allowEmptyOffers = false } = 
     if (!['verified', 'needs-review'].includes(offer.status)) errors.push(`${prefix}.status ist ungültig.`);
     if (!['ready', 'needs-review'].includes(offer.planningStatus)) errors.push(`${prefix}.planningStatus ist ungültig.`);
     if (offer.activationRequired === true && offer.planningStatus === 'ready') errors.push(`${prefix} darf mit aktivierungspflichtigem Rabatt nicht planningStatus=ready tragen.`);
+    if (offer.minimumPurchaseQuantity > 1 && offer.planningStatus === 'ready') errors.push(`${prefix} darf bei einer Mindestabnahme von mehr als einer Einheit nicht planningStatus=ready tragen.`);
+    if (hasConflictingAppPrice(offer.price, offer.loyaltyPrice, offer.activationRequired)) errors.push(`${prefix}: Der App-Preis muss niedriger als der Preis ohne App sein.`);
     if (offer.priceBasis === 'multipack-total' && (!Number.isInteger(offer.packCount) || offer.packCount < 2)) errors.push(`${prefix} kennzeichnet einen Multipack-Gesamtpreis ohne bestätigte Multipack-Menge.`);
     if (offer.priceBasis === 'weight-based-unit-unknown' && offer.planningStatus === 'ready') errors.push(`${prefix} darf ohne bestätigte Gewichtsbezugsmenge nicht planningStatus=ready tragen.`);
     const categoryScoped = offer.marketKey != null && marketByKey.get(offer.marketKey)?.categoryScoped === true;
