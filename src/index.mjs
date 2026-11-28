@@ -800,7 +800,18 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     : market.collectionMode === 'prospect'
       ? raw.priceText ?? ''
       : raw.priceText || lines.join('\n');
-  const priceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  const parsedPriceDetails = raw.priceDetails ?? parsePriceDetails(priceTextForParsing);
+  const priceArithmeticConflict = market.key === 'Edeka-Zellingen'
+    && Number.isFinite(parsedPriceDetails.currentPrice)
+    && Number.isFinite(parsedPriceDetails.previousPrice)
+    && Number.isFinite(parsedPriceDetails.discountAmount)
+    && Math.abs((parsedPriceDetails.previousPrice - parsedPriceDetails.currentPrice) - parsedPriceDetails.discountAmount) > 0.02;
+  const priceDetails = priceArithmeticConflict
+    ? { ...parsedPriceDetails, previousPrice: null, type: 'discount-with-unverified-previous' }
+    : parsedPriceDetails;
+  const basePrice = priceArithmeticConflict
+    ? null
+    : raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice);
   const explicitActivation = raw.activationRequired ?? (/(?:gutschein|coupon|rabatt)/i.test(text) && /(?:aktivieren|aktivierung erforderlich)/i.test(text));
   // Ein sichtbarer Standardpreis bleibt verwendbar, wenn nur der zusätzliche
   // XTRA-Preis erst nach Coupon-/Punkteeinlösung gilt.
@@ -875,7 +886,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     product: name ? (imageOcrRequired && imageProductStatus !== 'verified' ? 'image-unverified' : 'visible') : 'missing',
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
-    price: activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
+    price: priceArithmeticConflict || activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
     packSize: canInferPackUnit || canInferSinglePiece || canInferBarePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
@@ -887,6 +898,10 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       visibleText: normalizeText(raw.priceText ?? '').slice(0, 400) || null,
       currentPrice: Number.isFinite(price) ? price : null,
       previousPrice: priceDetails.previousPrice,
+      ...(priceArithmeticConflict ? {
+        reconciliationStatus: 'needs-review',
+        reviewReason: 'Der sichtbare Sparbetrag passt nicht zum zugeordneten alten Preis; ein Grundpreis wird nicht als sicher ausgegeben.'
+      } : {}),
       discountPercent: kauflandConditions.discountPercent,
       loyaltyPrice: kauflandConditions.loyaltyPrice,
       loyaltyProgram: kauflandConditions.loyaltyProgram,
@@ -945,6 +960,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   if (!name) reasons.push('Produktname fehlt.');
   if (!Number.isFinite(price)) reasons.push('Angebotspreis fehlt oder ist ungültig.');
   if (pack.ambiguous) reasons.push('Mehrere Packungsgrößen sichtbar; Mengenangabe muss geprüft werden.');
+  if (priceArithmeticConflict) reasons.push('Sparbetrag und zugeordneter alter Preis widersprechen sich; Preisbeleg muss geprüft werden.');
   if (activationRequired) reasons.push('Rabatt erfordert eine Aktivierung; der Preis ist nicht ohne Weiteres verfügbar.');
   if (weightUnitUnknown) reasons.push('Gewichtsabhängiger Thekenpreis ohne erkennbare Bezugsmenge.');
   if (recognized && classification.label === 'nonfood') {
@@ -966,7 +982,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
       recognized,
       name,
       price: Number.isFinite(price) ? price : null,
-      basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
+      basePrice,
       previousPrice: priceDetails.previousPrice,
       discountAmount: priceDetails.discountAmount,
       discountPercent: kauflandConditions.discountPercent,
@@ -1010,7 +1026,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const foodConfidenceBlocksPlanning = market.requireFoodConfidenceForPlanning === true
     && (classification.label !== 'food' || classification.confidence !== 'high');
   const planningReady = Boolean(
-    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
+    name && Number.isFinite(price) && !packBlocksPlanning && !foodConfidenceBlocksPlanning && !priceArithmeticConflict && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis
     && classification.label !== 'nonfood'
     && (categoryScopeActive || (classification.label === 'food' && classification.confidence === 'high'))
     && (!imageOcrBlocksPlanning || imageProductStatus === 'verified')
@@ -1026,7 +1042,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     productDescription,
     price,
     priceLabel: raw.priceLabel || findPriceLabel(lines),
-    basePrice: raw.basePrice == null ? priceDetails.previousPrice : Number(raw.basePrice),
+    basePrice,
     previousPrice: priceDetails.previousPrice,
     discountAmount: priceDetails.discountAmount,
     discountPercent: kauflandConditions.discountPercent,

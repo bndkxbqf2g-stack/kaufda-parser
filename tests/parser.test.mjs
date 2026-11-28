@@ -1127,6 +1127,78 @@ test('EDEKA lässt gemischte alkoholfreie Markenangebote nur zur Prüfung zu', (
   assert.equal(krombacher.offer.planningStatus, 'needs-review');
 });
 
+test('EDEKA setzt widersprüchliche Sparbeträge nicht als sicheren Vorpreis ein', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const cases = [
+    {
+      name: 'Franken Brunnen',
+      productDescription: 'Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+      text: '3,00 € sparen! ab 4,99 € Franken Brunnen 7,99 € 1 l = 0,42 Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+      priceText: '3,00 € sparen! 4,99 € 5,99 € 7,99 €',
+      expectedCurrent: 4.99,
+      expectedParsedPrevious: 5.99,
+      expectedSaving: 3,
+      packSizeText: 'Mineralwasser, verschiedene Sorten 12 x 1 Liter Kasten zzgl. 3,30 Pfand',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=5&locality=Zellingen&productId=373640df-ddc5-4eea-82f2-e6f57ce3d71e'
+    },
+    {
+      name: 'Salami',
+      productDescription: 'verschiedene Sorten, Ausgenommen Bio Salami 80 g. 50/80 g Packung',
+      text: '0,60 € sparen! ab 1,29 € Salami 2,29 € 1 kg = 16,13-25,80 verschiedene Sorten, Ausgenommen Bio Salami 80 g. 50/80 g Packung',
+      priceText: '0,60 € sparen! 1,29 € 1,69 € 2,29 €',
+      expectedCurrent: 1.29,
+      expectedParsedPrevious: 1.69,
+      expectedSaving: 0.6,
+      packSizeText: 'verschiedene Sorten, Ausgenommen Bio Salami 80 g. 50/80 g Packung',
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/c61bf301-f782-4a05-be51-ef4c2c19c78d?adPlacement=ad_placement__bv_premium_panel&lat=49.9016992&lng=9.812895&pageType=SEARCH_RESULT_PAGE&sourceType=PORTAL_STARTPAGE&zip=97225&page=19&locality=Zellingen&productId=4148e5fc-1cc4-4fc0-9546-926b435e5f54'
+    }
+  ];
+
+  for (const item of cases) {
+    const parsed = parsePriceDetails(item.priceText);
+    assert.equal(parsed.currentPrice, item.expectedCurrent, item.name);
+    assert.equal(parsed.previousPrice, item.expectedParsedPrevious, item.name);
+    assert.equal(parsed.discountAmount, item.expectedSaving, item.name);
+    assert.notEqual(
+      Math.round((parsed.previousPrice - parsed.currentPrice) * 100),
+      Math.round(parsed.discountAmount * 100),
+      `${item.name} must have a visible arithmetic conflict`
+    );
+
+    const result = assessOffer({
+      cardId: item.sourceUrl.match(/productId=([^&]+)/)?.[1],
+      name: item.name,
+      text: item.text,
+      productDescription: item.productDescription,
+      priceText: item.priceText,
+      packSizeText: item.packSizeText,
+      sourceUrl: item.sourceUrl
+    }, edeka, categoryConfig, '2026-11-28T10:51:54.082Z');
+
+    assert.equal(result.offer.price, item.expectedCurrent, item.name);
+    assert.equal(result.offer.previousPrice, null, item.name);
+    assert.equal(result.offer.basePrice, null, item.name);
+    assert.equal(result.offer.discountAmount, item.expectedSaving, item.name);
+    assert.equal(result.offer.fieldStatus.price, 'needs-review', item.name);
+    assert.equal(result.offer.evidence.price.reconciliationStatus, 'needs-review', item.name);
+    assert.match(result.offer.evidence.price.reviewReason, /Sparbetrag/);
+    assert.equal(result.offer.planningStatus, 'needs-review', item.name);
+  }
+
+  const consistentDiscount = assessOffer({
+    name: 'Salami',
+    text: '0,30 € sparen! 1,19 € 1,49 € Salami 80 g Packung',
+    productDescription: '80 g Packung',
+    priceText: '0,30 € sparen! 1,19 € 1,49 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:51:54.082Z');
+  assert.equal(consistentDiscount.offer.previousPrice, 1.49);
+  assert.equal(consistentDiscount.offer.basePrice, 1.49);
+  assert.equal(consistentDiscount.offer.planningStatus, 'ready');
+});
+
 test('Fixturekarten liefern PWA-kompatible Felder und Status', () => {
   const result = assessOffer(fixture.cards[0], market, mergeConfig(), fixture.capturedAt);
   assert.equal(result.state, 'accepted');
