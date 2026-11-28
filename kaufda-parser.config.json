@@ -50,7 +50,8 @@
       "interpretationProfile": "aldi-sued-v1",
       "location": { "city": "Zellingen", "zip": "97225", "lat": 49.9016992, "lng": 9.812895 },
       "url": "https://www.kaufda.de/search?query=ALDI+SÜD&lat=49.9016992&lng=9.812895&city=Zellingen&zip=97225",
-      "productGroups": ["food"]
+      "productGroups": ["food"],
+      "nonFoodTerms": ["Spirituosen", "Champagner", "Rioja", "Crianza", "DOCa"]
     },
     {
       "key": "Edeka-Zellingen",

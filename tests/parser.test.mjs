@@ -340,6 +340,56 @@ test('ALDI SÜD gibt variable oder fehlende Packungsgrößen nicht planungsberei
   assert.equal(measuredPack.planningStatus, 'ready');
 });
 
+test('ALDI SÜD blockiert belegte Wein- und Spirituosenangebote lokal', () => {
+  const configPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json');
+  const repositoryConfig = JSON.parse(readFileSync(configPath, 'utf8'));
+  const aldi = repositoryConfig.markets.find((candidate) => candidate.key === 'Aldi-Sued-Zellingen');
+  const categoryConfig = mergeConfig({
+    categoryScopeActive: true,
+    offerCategoryMode: 'include-all',
+    imageOcr: { enabled: false, required: false }
+  });
+  const alcoholicBeverages = [
+    {
+      name: 'Spirituosen',
+      text: 'Spirituosen\n0,7-l-Flasche\n37,5 % vol.\n14,99 €',
+      packSizeText: '0,7-l-Flasche',
+      priceText: '14,99 €'
+    },
+    {
+      name: 'Champagner brut',
+      text: 'Champagner brut\nFrankreich, 0,375-l-Flasche\n9,99 €',
+      packSizeText: '0,375-l-Flasche',
+      priceText: '9,99 €'
+    },
+    {
+      name: '2023 Rioja Crianza DOCa',
+      text: '2023 Rioja Crianza DOCa\nSpanien, trocken, 0,75-l-Flasche\n3,99 €',
+      packSizeText: '0,75-l-Flasche',
+      priceText: '3,99 €'
+    }
+  ];
+  for (const item of alcoholicBeverages) {
+    const result = assessOffer({
+      ...item,
+      sourceUrl: 'https://www.kaufda.de/contentViewer/static/aldi-alcohol'
+    }, aldi, categoryConfig);
+    assert.equal(result.state, 'rejected', item.name);
+    assert.equal(result.reviewItem.classification.label, 'nonfood', item.name);
+    assert.equal(result.offer, undefined, item.name);
+  }
+
+  const alcoholicDessert = assessOffer({
+    name: 'Dessert',
+    text: 'Dessert\nEnthält Alkohol\n60-g-Gläschen\n0,89 €',
+    packSizeText: '60-g-Gläschen',
+    priceText: '0,89 €',
+    sourceUrl: 'https://www.kaufda.de/contentViewer/static/aldi-dessert'
+  }, aldi, categoryConfig);
+  assert.equal(alcoholicDessert.state, 'accepted');
+  assert.notEqual(alcoholicDessert.offer.classification.label, 'nonfood');
+});
+
 test('parsePrice liest deutsche Angebotspreise inklusive Tausenderpunkt', () => {
   assert.equal(parsePrice('ab 2,29 €'), 2.29);
   assert.equal(parsePrice('1,49 € UVP 1,99 €'), 1.49);
