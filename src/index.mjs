@@ -823,7 +823,10 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   const validFrom = raw.validFrom ?? validity.validFrom ?? null;
   const validUntil = raw.validUntil ?? raw.validTo ?? validity.validUntil ?? null;
   const sourceUrl = raw.sourceUrl ?? market.url ?? null;
-  const productNonFoodMatches = exactTermsFound(name ?? '', market.nonFoodProductTerms ?? []);
+  const productNonFoodMatches = uniqueStrings([
+    ...exactTermsFound(name ?? '', market.nonFoodProductTerms ?? []),
+    ...exactTermsFound(productDescription, market.nonFoodDescriptionTerms ?? [])
+  ]);
   const alcoholStrengthEvidence = market.rejectExplicitAlcoholEvidence === true
     && /\b\d{1,2}(?:[,.]\d)?\s*%\s*vol\b\.?/i.test(text)
     && /\b\d+(?:[,.]\d+)?\s*(?:liter|l)\s*(?:flasche|dose|kasten)\b/i.test(text);
