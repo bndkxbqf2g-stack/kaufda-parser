@@ -1445,7 +1445,7 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
         ocrDiagnostics.assignedPriceLines += pageDetails.assignedPriceLineCount;
         ocrDiagnostics.packLines += pageDetails.packLineCount;
         ocrDiagnostics.assignedPackLines += pageDetails.assignedPackLineCount;
-        if (debugProspect && pageNumber === 3) {
+        if (debugProspect && (pageNumber === 3 || pageDetails.assignedPriceLineCount > 0)) {
           const lineKey = (line) => `${line.text}|${line.box.x},${line.box.y},${line.box.width},${line.box.height}`;
           const assignedKeys = new Set(assignedLines.map(lineKey));
           ocrDiagnostics.debugPages.push({

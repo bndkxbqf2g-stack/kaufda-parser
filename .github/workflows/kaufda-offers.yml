@@ -116,7 +116,16 @@ jobs:
             planningStatus: offer.planningStatus,
             ...(includeEvidence ? { evidence: offer.evidence, imageProductStatus: offer.fieldStatus?.imageProduct } : {})
           }));
-          console.log(JSON.stringify({ summary: d.summary, market: d.markets[0], offers }, null, 2));
+          const reviewItems = includeEvidence ? d.reviewItems.map((item) => ({
+            name: item.name,
+            productDescription: item.productDescription,
+            price: item.price,
+            packSize: item.packSize,
+            state: item.state,
+            reasons: item.reasons,
+            evidence: item.evidence
+          })) : undefined;
+          console.log(JSON.stringify({ summary: d.summary, market: d.markets[0], offers, reviewItems }, null, 2));
           NODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
