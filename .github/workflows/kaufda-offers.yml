@@ -2,9 +2,17 @@ name: KaufDA-Angebote aktualisieren
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 'Kaufland einzeln prüfen oder alle Märkte zusammen aktualisieren'
+        type: choice
+        options:
+          - kaufland
+          - all
+        default: kaufland
+        required: true
   schedule:
-    # Täglich 05:15 UTC. Der Lauf bleibt begrenzt und veröffentlicht den
-    # Vollständigkeitsstatus zusammen mit den Angeboten.
+    # Täglich 05:15 UTC.
     - cron: '15 5 * * *'
 
 concurrency:
@@ -12,12 +20,30 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  update-offers:
+  select-markets:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    outputs:
+      market_keys: ${{ steps.selection.outputs.market_keys }}
+      publish: ${{ steps.selection.outputs.publish }}
+    steps:
+      - id: selection
+        env:
+          RUN_SCOPE: ${{ inputs.scope || 'kaufland' }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$RUN_SCOPE" = "all" ]; then
+            echo 'market_keys=["Lidl-Zellingen","Aldi-Sued-Zellingen","Edeka-Zellingen","Netto-Thuengersheim","Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
+            echo 'publish=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'market_keys=["Kaufland-Wuerzburg"]' >> "$GITHUB_OUTPUT"
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  test-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -26,17 +52,67 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test
       - run: node src/cli.mjs validate --config kaufda-parser.config.json
+
+  parse-market:
+    needs: [test-and-validate, select-markets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        market: ${{ fromJSON(needs.select-markets.outputs.market_keys) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - run: npm ci --no-audit --no-fund
       - run: npx --no-install playwright install chromium
-      - name: KaufDA-Angebote begrenzt erfassen
-        run: node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.next.json
-      - name: Ergebnis prüfen
+      - name: Markt erfassen
+        env:
+          MARKET_KEY: ${{ matrix.market }}
+        run: |
+          mkdir -p generated/parts
+          node src/cli.mjs parse --config kaufda-parser.config.json --market "$MARKET_KEY" --output "generated/parts/$MARKET_KEY.json"
+      - name: Marktergebnis prüfen
+        env:
+          MARKET_KEY: ${{ matrix.market }}
+        run: node src/cli.mjs verify --config kaufda-parser.config.json --allow-empty --input "generated/parts/$MARKET_KEY.json"
+      - name: Marktstatus ausgeben
+        run: node -e "const d=require('./generated/parts/${{ matrix.market }}.json'); console.log(JSON.stringify({summary:d.summary,market:d.markets[0],offers:d.offers.map(({product,price,pack,sourcePage,planningStatus})=>({product,price,pack,sourcePage,planningStatus}))}, null, 2));"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: market-${{ matrix.market }}
+          path: generated/parts/${{ matrix.market }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [parse-market, select-markets]
+    if: needs.select-markets.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: market-*
+          path: generated/parts
+          merge-multiple: true
+      - name: Märkte zusammenführen
+        run: node src/cli.mjs merge --config kaufda-parser.config.json --input-dir generated/parts --output generated/offers.next.json
+      - name: Gesamtfeed prüfen
         run: node src/cli.mjs verify --config kaufda-parser.config.json --input generated/offers.next.json
       - name: Ergebnis veröffentlichen
         run: mv generated/offers.next.json generated/offers.json
       - name: Laufdaten ausgeben
-        run: node -e "const d=require('./generated/offers.json'); console.log(JSON.stringify(d.summary, null, 2));"
-      - name: Diff prüfen
-        run: git diff --check
+        run: node -e "const d=require('./generated/offers.json'); console.log(JSON.stringify({summary:d.summary,markets:d.markets.map(({market,marketKey,recognizedOfferCount,loadedCardCount,imageOcrAttempted,imageOcrVerified,ocrDiagnostics})=>({market,marketKey,recognizedOfferCount,loadedCardCount,imageOcrAttempted,imageOcrVerified,ocrDiagnostics}))}, null, 2));"
+      - run: git diff --check
       - name: Änderungen veröffentlichen
         run: |
           git config user.name 'github-actions[bot]'

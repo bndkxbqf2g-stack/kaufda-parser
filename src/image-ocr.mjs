@@ -63,15 +63,24 @@ export function originalImageUrl(value) {
   return url.href;
 }
 
+export function extractTesseractLines(data = {}) {
+  const nestedLines = (data.blocks ?? []).flatMap((block) =>
+    (block.paragraphs ?? []).flatMap((paragraph) => paragraph.lines ?? []));
+  if (nestedLines.length) return nestedLines;
+  return Array.isArray(data.lines) ? data.lines : [];
+}
+
 export async function createImageTextReader(options = {}) {
   const { createWorker } = await import('tesseract.js');
   const worker = await createWorker(options.language ?? 'deu+eng', 1, { logger: () => {} });
   return {
     async recognize(image) {
-      const result = await worker.recognize(image);
-      return (result.data.lines ?? []).map((line) => ({
+      const result = await worker.recognize(image, {}, { blocks: true });
+      return extractTesseractLines(result.data).map((line) => ({
         text: normalize(line.text),
-        confidence: Number.isFinite(Number(line.confidence)) ? Number(line.confidence) : null,
+        confidence: line.confidence == null || line.confidence === ''
+          ? null
+          : Number.isFinite(Number(line.confidence)) ? Number(line.confidence) : null,
         box: line.bbox ? {
           x: line.bbox.x0,
           y: line.bbox.y0,

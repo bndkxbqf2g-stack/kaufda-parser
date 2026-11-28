@@ -17,6 +17,7 @@ import {
   marketCollectionStatus,
   mergeConfig,
   matchVisibleLocation,
+  mergeMarketDocuments,
   normalizeProspectProductName,
   normalizeOffer,
   PUBLISHED_OFFER_FIELDS,
@@ -32,7 +33,7 @@ import {
   validateConfig,
   validateOutputDocument
 } from '../src/index.mjs';
-import { fetchTrustedImage, matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
+import { extractTesseractLines, fetchTrustedImage, matchImageProductName, originalImageUrl } from '../src/image-ocr.mjs';
 
 const fixturePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'kaufda-visible-cards.json');
 const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
@@ -184,6 +185,15 @@ test('Bild-OCR muss den Produktnamen global bestätigen', () => {
   assert.equal(originalImageUrl('https://content-media.bonial.biz.attacker.test/id/main.jpg'), null);
   assert.equal(originalImageUrl('https://content-media.bonial.biz:8443/id/main.jpg'), null);
   assert.equal(originalImageUrl('https://user@content-media.bonial.biz/id/main.jpg'), null);
+});
+
+test('Tesseract-OCR liest Zeilen aus der verschachtelten Blockausgabe', () => {
+  const line = { text: 'KINDER RIEGEL', confidence: 91, bbox: { x0: 10, y0: 20, x1: 90, y1: 34 } };
+  assert.deepEqual(extractTesseractLines({
+    blocks: [{ paragraphs: [{ lines: [line] }] }]
+  }), [line]);
+  assert.deepEqual(extractTesseractLines({ lines: [line] }), [line]);
+  assert.deepEqual(extractTesseractLines({ text: 'KINDER RIEGEL' }), []);
 });
 
 test('OCR-Bildabruf begrenzt Weiterleitungen, Inhaltstyp und Größe', async () => {
@@ -818,6 +828,46 @@ test('Teilfeed mit komplett ausgefallenem Markt wird nicht veröffentlicht', () 
   const validation = validateOutputDocument(document);
   assert.equal(validation.valid, false);
   assert.match(validation.errors.join(' '), /Kaufland Würzburg.*fehlgeschlagen/);
+});
+
+test('Einzelmarktergebnisse lassen sich trotz leerem Kaufland-Feed sicher zusammenführen', () => {
+  const config = mergeConfig({
+    location: { city: 'Zellingen', zip: '97225', lat: 49.9016992, lng: 9.812895 },
+    markets: [
+      { ...market, label: 'Lidl Zellingen', location: { city: 'Zellingen', zip: '97225', lat: 49.9016992, lng: 9.812895 } },
+      {
+        key: 'Kaufland-Wuerzburg',
+        label: 'Kaufland Würzburg',
+        store: 'Kaufland',
+        url: 'https://www.kaufda.de/search?query=Kaufland',
+        location: { city: 'Würzburg' },
+        collectionMode: 'prospect'
+      }
+    ]
+  });
+  const offer = { ...normalizeOffer(fixture.cards[0], config.markets[0], config), marketLocationStatus: 'matched' };
+  const lidlDocument = buildOffersDocument({
+    config,
+    results: [{ market: 'Lidl Zellingen', marketKey: 'Lidl-Zellingen', locationStatus: 'matched', completenessStatus: 'complete', errors: [], recognizedOfferCount: 1, offers: [offer], reviewItems: [] }],
+    offers: [offer],
+    fetchedAt: fixture.capturedAt
+  });
+  const kauflandDocument = buildOffersDocument({
+    config,
+    results: [{ market: 'Kaufland Würzburg', marketKey: 'Kaufland-Wuerzburg', locationStatus: 'matched', completenessStatus: 'incomplete', errors: [], recognizedOfferCount: 0, expectedPageCount: 82, expectedCountKind: 'prospect-pages', offers: [], reviewItems: [] }],
+    offers: [],
+    fetchedAt: fixture.capturedAt
+  });
+
+  assert.equal(validateOutputDocument(kauflandDocument).valid, false);
+  assert.equal(validateOutputDocument(kauflandDocument, { allowEmptyOffers: true }).valid, true);
+  const merged = mergeMarketDocuments(config, [kauflandDocument, lidlDocument]);
+  assert.equal(validateOutputDocument(merged).valid, true);
+  assert.equal(merged.summary.marketCount, 2);
+  assert.equal(merged.summary.foodOfferCount, 1);
+  assert.equal(merged.summary.targetPageCount, 82);
+  assert.deepEqual(merged.markets.map((item) => item.marketKey), ['Lidl-Zellingen', 'Kaufland-Wuerzburg']);
+  assert.throws(() => mergeMarketDocuments(config, [lidlDocument]), /Erwartet wurden 2 Marktdateien/);
 });
 
 test('Einzelmarktlauf darf den konfigurierten Gesamtfeed nicht überschreiben', () => {

@@ -1710,7 +1710,7 @@ export async function runParser(configInput, { outputPath = null, marketKey = nu
   const offers = dedupeOffers(results.flatMap((result) => result.offers ?? []));
   const document = buildOffersDocument({ config, results, offers });
   if (outputPath) {
-    const validation = validateOutputDocument(document);
+    const validation = validateOutputDocument(document, { allowEmptyOffers: Boolean(marketKey) });
     if (!validation.valid) throw new Error(`Angebotsdatei wird wegen fehlgeschlagener Markt-/Feed-Prüfung nicht geschrieben: ${validation.errors.join('; ')}`);
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
     await fs.writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
@@ -1762,6 +1762,49 @@ export function buildOffersDocument({ config: configInput, results = [], offers 
   };
 }
 
+export function mergeMarketDocuments(configInput, documents = []) {
+  const config = mergeConfig(configInput);
+  if (documents.length !== config.markets.length) {
+    throw new Error(`Erwartet wurden ${config.markets.length} Marktdateien, erhalten wurden ${documents.length}.`);
+  }
+  const configuredKeys = new Set(config.markets.map((market) => market.key));
+  const documentsByMarket = new Map();
+  documents.forEach((document, index) => {
+    const validation = validateOutputDocument(document, { allowEmptyOffers: true });
+    if (!validation.valid) {
+      throw new Error(`Marktdatei ${index + 1} ist ungültig: ${validation.errors.join('; ')}`);
+    }
+    if (document.markets.length !== 1) {
+      throw new Error(`Marktdatei ${index + 1} muss genau einen Markt enthalten.`);
+    }
+    const marketKey = document.markets[0].marketKey;
+    if (!configuredKeys.has(marketKey)) throw new Error(`Unbekannter Markt in Marktdatei ${index + 1}: ${marketKey ?? 'ohne Schlüssel'}.`);
+    if (documentsByMarket.has(marketKey)) throw new Error(`Doppelte Marktdatei für ${marketKey}.`);
+    documentsByMarket.set(marketKey, document);
+  });
+
+  const missing = config.markets.map((market) => market.key).filter((key) => !documentsByMarket.has(key));
+  if (missing.length) throw new Error(`Marktdateien fehlen für: ${missing.join(', ')}.`);
+
+  const results = config.markets.map((configuredMarket) => {
+    const document = documentsByMarket.get(configuredMarket.key);
+    return {
+      ...document.markets[0],
+      offers: document.offers,
+      reviewItems: document.reviewItems ?? []
+    };
+  });
+  const merged = buildOffersDocument({
+    config,
+    results,
+    offers: results.flatMap((result) => result.offers),
+    fetchedAt: new Date().toISOString()
+  });
+  const validation = validateOutputDocument(merged);
+  if (!validation.valid) throw new Error(`Zusammengeführter Gesamtfeed ist ungültig: ${validation.errors.join('; ')}`);
+  return merged;
+}
+
 export function validateConfig(configInput) {
   const config = mergeConfig(configInput);
   const errors = [];
@@ -1785,7 +1828,7 @@ export function validateConfig(configInput) {
   return { valid: errors.length === 0, errors, config };
 }
 
-export function validateOutputDocument(document) {
+export function validateOutputDocument(document, { allowEmptyOffers = false } = {}) {
   const summary = document?.summary ?? {};
   const errors = [];
   const offers = Array.isArray(document?.offers) ? document.offers : [];
@@ -1797,7 +1840,7 @@ export function validateOutputDocument(document) {
   if (!Number.isInteger(summary.marketCount) || summary.marketCount !== markets.length) errors.push('summary.marketCount stimmt nicht mit markets überein.');
   if (!Number.isInteger(summary.foodOfferCount) || summary.foodOfferCount !== offers.length) errors.push('summary.foodOfferCount stimmt nicht mit offers überein.');
   if (summary.categoryOfferCount != null && (!Number.isInteger(summary.categoryOfferCount) || summary.categoryOfferCount !== offers.length)) errors.push('summary.categoryOfferCount stimmt nicht mit offers überein.');
-  if (summary.foodOfferCount < 1) errors.push('Keine Lebensmittelangebote erkannt.');
+  if (!allowEmptyOffers && summary.foodOfferCount < 1) errors.push('Keine Lebensmittelangebote erkannt.');
   const readyCount = offers.filter((offer) => offer?.planningStatus === 'ready').length;
   const reviewCount = offers.filter((offer) => offer?.planningStatus !== 'ready').length;
   if (!Number.isInteger(summary.planningReadyOfferCount) || summary.planningReadyOfferCount !== readyCount) errors.push('summary.planningReadyOfferCount stimmt nicht mit offers überein.');

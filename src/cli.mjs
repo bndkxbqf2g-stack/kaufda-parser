@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { loadConfig, mergeConfig, runParser, validateConfig, validateOutputDocument } from './index.mjs';
+import { loadConfig, mergeConfig, mergeMarketDocuments, runParser, validateConfig, validateOutputDocument } from './index.mjs';
 
 function args(argv) {
   const result = { _: [] };
@@ -24,12 +24,15 @@ Befehle:
   init      Beispielkonfiguration und GitHub-Action anlegen
   validate  Konfiguration prüfen
   parse     KaufDA-Seiten öffnen, Angebote laden und JSON schreiben
+  merge     Einzelmarktergebnisse zu einem Gesamtfeed zusammenführen
   verify    Angebotsdatei auf sichere Veröffentlichung prüfen
 
 Beispiele:
   node src/cli.mjs init --city Zellingen --zip 97225
   node src/cli.mjs validate --config kaufda-parser.config.json
   node src/cli.mjs parse --config kaufda-parser.config.json --output generated/offers.json
+  node src/cli.mjs parse --config kaufda-parser.config.json --market Lidl-Zellingen --output generated/parts/Lidl-Zellingen.json
+  node src/cli.mjs merge --config kaufda-parser.config.json --input-dir generated/parts --output generated/offers.next.json
   node src/cli.mjs verify --input generated/offers.json
   node src/cli.mjs parse --market Aldi-Sued --headed
 `);
@@ -128,7 +131,7 @@ async function main() {
   if (command === 'verify') {
     const inputPath = options.input ?? path.join(config.output.directory, config.output.file);
     const document = JSON.parse(await fs.readFile(inputPath, 'utf8'));
-    const result = validateOutputDocument(document);
+    const result = validateOutputDocument(document, { allowEmptyOffers: Boolean(options['allow-empty']) });
     result.warnings.forEach((warning) => console.warn(`Warnung: ${warning}`));
     if (!result.valid) {
       console.error(result.errors.join('\n'));
@@ -137,6 +140,19 @@ async function main() {
     }
     const label = document.summary.offerScope === 'selected-category' ? 'Kategorieangebote' : 'Lebensmittelangebote';
     console.log(`Angebotsdatei veröffentlichbar: ${document.summary.foodOfferCount} ${label}.`);
+    return;
+  }
+  if (command === 'merge') {
+    if (!check.valid) throw new Error(check.errors.join('; '));
+    const inputDirectory = path.resolve(options['input-dir'] ?? path.join(config.output.directory, 'parts'));
+    const inputFiles = (await fs.readdir(inputDirectory)).filter((name) => name.endsWith('.json')).sort();
+    const documents = await Promise.all(inputFiles.map(async (name) => JSON.parse(await fs.readFile(path.join(inputDirectory, name), 'utf8'))));
+    const document = mergeMarketDocuments(config, documents);
+    const outputPath = path.resolve(options.output ?? path.join(config.output.directory, config.output.file));
+    await fs.mkdir(path.dirname(outputPath), { recursive: true });
+    await fs.writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, 'utf8');
+    console.log(JSON.stringify(document.summary, null, 2));
+    console.log(`Ausgabe: ${outputPath}`);
     return;
   }
   if (command !== 'parse') return help();

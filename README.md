@@ -139,22 +139,20 @@ Gesamt: 870 geladene Karten, 869 mit Produkt und Preis erkannt, 267 Lebensmittel
 
 ## Täglicher kostenloser Workflow
 
-`.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC und kann zusätzlich manuell über **Actions → KaufDA-Angebote aktualisieren → Run workflow** gestartet werden. Codeänderungen starten keinen Live-Lauf und ändern den Angebotsfeed nicht automatisch.
+`.github/workflows/kaufda-offers.yml` läuft täglich um 05:15 UTC. Beim manuellen Start ist standardmäßig **Kaufland einzeln** ausgewählt; über den Eingabewert `all` können alle Märkte gestartet werden. Codeänderungen starten keinen Live-Lauf und ändern den Angebotsfeed nicht automatisch.
 
-Der Workflow:
+Der Workflow arbeitet in getrennten Markt-Jobs:
 
-1. installiert die Abhängigkeiten und führt die Unit-Tests aus;
-2. installiert Chromium für Playwright;
-3. liest Märkte mit `collectionMode: "tiles"` über sichtbare Angebotskacheln; Kaufland lädt stattdessen den Prospekt, besucht die Seiten in Doppelseiten-Schritten und ordnet lokale OCR den sichtbaren Produkt-Overlaybereichen zu;
-4. öffnet für erkannte Kategorie-Karten die verlinkte öffentliche KaufDA-Detailansicht;
-5. übernimmt daraus ausschließlich die vereinbarten Produkt-, Beschreibungs-, Preis-, Mengen-, Grundpreis-, Gültigkeits-, Markt- und Quellenfelder;
-6. schreibt zunächst nach `generated/offers.next.json`;
-7. prüft, ob mindestens ein Lebensmittelangebot und ein gültiges Dokument vorhanden sind;
-8. veröffentlicht die geprüfte Datei erst danach als `generated/offers.json`;
-9. lässt unvollständige Läufe sichtbar, behauptet aber keine Vollständigkeit;
-10. veröffentlicht keinen Feed, wenn ein konfigurierter Markt vollständig fehlschlägt.
+1. Ein Vorlauf führt die Unit-Tests aus und prüft die Konfiguration.
+2. Für jeden ausgewählten Markt läuft ein eigener Job. Kaufland besucht seinen Prospekt; die anderen Märkte lesen sichtbare Angebotskacheln.
+3. Jeder Job prüft sein Zwischenergebnis und lädt eine Marktdatei als Workflow-Artefakt hoch. Ein leerer Marktfeed ist nur in dieser Zwischenstufe zulässig.
+4. Bei einem Kaufland-Einzellauf bleibt das Ergebnis als Markt-Artefakt verfügbar; der gemeinsame Feed wird dabei nicht überschrieben.
+5. Bei Zeitplan oder Auswahl `all` führt der abschließende Job alle fünf Dateien mit `node src/cli.mjs merge` zusammen und prüft den Gesamtfeed. Fehlt ein Markt oder schlägt ein Marktjob fehl, wird kein Teilfeed veröffentlicht.
+6. Erst nach erfolgreicher Gesamtprüfung wird `generated/offers.json` einmalig aktualisiert.
 
-Die PWA kann den öffentlichen Rohfeed später ohne eigenen Server beziehen:
+Die Marktdateien liegen während des Laufs unter `generated/parts/<marketKey>.json`. Für manuelle Einzelmarkttests stehen `parse --market <key>`, `verify --allow-empty` und `merge --input-dir <directory>` bereit. Die Marktmetadaten `markets[].ocrDiagnostics` zeigen je Prospekt-Doppelseite, wie viele OCR-Zeilen erkannt und Produktregionen zugeordnet wurden.
+
+Wenn Markt-Schlüssel zur Konfiguration hinzukommen oder sich ändern, muss die Matrixliste im Workflow mit angepasst werden. Der öffentliche Gesamtfeed bleibt weiterhin eine einzige Datei:
 
 ```text
 https://raw.githubusercontent.com/bndkxbqf2g-stack/kaufda-parser/main/generated/offers.json
