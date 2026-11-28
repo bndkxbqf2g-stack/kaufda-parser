@@ -415,17 +415,51 @@ export function marketCollectionStatus({ loadedCardCount = 0, locationStatus = '
   return targetReached || (scrollCanConfirmCoverage && scrollExhausted) ? 'complete' : 'incomplete';
 }
 
-export function assignOcrLinesToRegions(lines = [], regions = []) {
+export function scaleOcrLinesToViewport(lines = [], screenshot = null, viewport = null) {
+  // Normalize raster coordinates before comparing them with CSS-pixel DOM bounds.
+  if (!Buffer.isBuffer(screenshot) || screenshot.length < 24 || !viewport?.width || !viewport?.height) return lines;
+  const pngSignature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (!screenshot.subarray(0, 8).equals(pngSignature)) return lines;
+  const screenshotWidth = screenshot.readUInt32BE(16);
+  const screenshotHeight = screenshot.readUInt32BE(20);
+  if (!screenshotWidth || !screenshotHeight
+    || (screenshotWidth === viewport.width && screenshotHeight === viewport.height)) return lines;
+  const scaleX = viewport.width / screenshotWidth;
+  const scaleY = viewport.height / screenshotHeight;
+  return lines.map((line) => line.box ? {
+    ...line,
+    box: {
+      ...line.box,
+      x: line.box.x * scaleX,
+      y: line.box.y * scaleY,
+      width: line.box.width * scaleX,
+      height: line.box.height * scaleY
+    }
+  } : line);
+}
+
+export function assignOcrLinesToRegions(lines = [], regions = [], tolerance = 8) {
   const grouped = regions.map((region) => ({ ...region, ocrLines: [] }));
   for (const line of lines) {
     if (!line.box) continue;
     const x = line.box.x + line.box.width / 2;
     const y = line.box.y + line.box.height / 2;
-    const containing = grouped
-      .filter((region) => x >= region.x - 8 && x <= region.x + region.width + 8 && y >= region.y - 8 && y <= region.y + region.height + 8)
-      .sort((left, right) => left.width * left.height - right.width * right.height);
+    // OCR line boxes can cross an overlay edge even when their text belongs to it.
+    const candidates = grouped.map((region, index) => {
+      const left = Math.max(line.box.x, region.x);
+      const top = Math.max(line.box.y, region.y);
+      const right = Math.min(line.box.x + line.box.width, region.x + region.width);
+      const bottom = Math.min(line.box.y + line.box.height, region.y + region.height);
+      const intersection = Math.max(0, right - left) * Math.max(0, bottom - top);
+      const lineArea = Math.max(1, line.box.width * line.box.height);
+      const overlap = intersection / lineArea;
+      const centerInside = x >= region.x - tolerance && x <= region.x + region.width + tolerance
+        && y >= region.y - tolerance && y <= region.y + region.height + tolerance;
+      return { region, index, overlap, centerInside, area: region.width * region.height };
+    }).filter((candidate) => candidate.centerInside || candidate.overlap >= 0.2)
+      .sort((left, right) => right.overlap - left.overlap || left.area - right.area || left.index - right.index);
     const confidence = line.confidence == null || line.confidence === '' ? null : Number(line.confidence);
-    containing[0]?.ocrLines.push({
+    candidates[0]?.region.ocrLines.push({
       text: line.text,
       confidence: Number.isFinite(confidence) ? confidence : null,
       box: { ...line.box }
@@ -1320,6 +1354,19 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
   const locationStatus = matchVisibleLocation(visibleLocation, market.location ?? config.location);
   const warnings = [];
   const errors = [];
+  const ocrDiagnostics = {
+    pageSpreads: 0,
+    ocrLines: 0,
+    productRegions: 0,
+    assignedLines: 0,
+    regionsWithAssignedLines: 0,
+    priceLines: 0,
+    assignedPriceLines: 0,
+    packLines: 0,
+    assignedPackLines: 0,
+    verifiedProductRegions: 0,
+    pageDetails: []
+  };
   if (!Number.isInteger(expectedPageCount) || expectedPageCount < 1) {
     return {
       offers: [], reviewItems: [], expectedPageCount: null, expectedCountKind: 'prospect-pages',
@@ -1364,9 +1411,35 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
             };
           })
           .filter((region) => region.visible && region.name.length >= 2 && region.width * region.height > 1200));
-        const screenshot = await page.screenshot({ type: 'png' });
-        const ocrLines = await reader.recognize(screenshot);
+        const screenshot = await page.screenshot({ type: 'png', scale: 'css' });
+        const viewport = page.viewportSize();
+        const ocrLines = scaleOcrLinesToViewport(await reader.recognize(screenshot), screenshot, viewport);
         const grouped = assignOcrLinesToRegions(ocrLines, regions);
+        const assignedLines = grouped.flatMap((region) => region.ocrLines);
+        const isPriceLine = (line) => /\d+(?:[,.]\d{1,2})?\s*€/.test(line.text) && !UNIT_PRICE_LINE_RE.test(line.text);
+        const isPackLine = (line) => (PACK_RE.test(line.text) || PACK_RANGE_RE.test(line.text)) && !UNIT_PRICE_LINE_RE.test(line.text);
+        const pageDetails = {
+          firstPage: pageNumber,
+          lastPage: Math.min(expectedPageCount, pageNumber + 1),
+          ocrLineCount: ocrLines.length,
+          productRegionCount: grouped.length,
+          assignedLineCount: assignedLines.length,
+          regionsWithAssignedLines: grouped.filter((region) => region.ocrLines.length).length,
+          priceLineCount: ocrLines.filter(isPriceLine).length,
+          assignedPriceLineCount: assignedLines.filter(isPriceLine).length,
+          packLineCount: ocrLines.filter(isPackLine).length,
+          assignedPackLineCount: assignedLines.filter(isPackLine).length,
+          verifiedProductRegionCount: 0
+        };
+        ocrDiagnostics.pageSpreads += 1;
+        ocrDiagnostics.ocrLines += pageDetails.ocrLineCount;
+        ocrDiagnostics.productRegions += pageDetails.productRegionCount;
+        ocrDiagnostics.assignedLines += pageDetails.assignedLineCount;
+        ocrDiagnostics.regionsWithAssignedLines += pageDetails.regionsWithAssignedLines;
+        ocrDiagnostics.priceLines += pageDetails.priceLineCount;
+        ocrDiagnostics.assignedPriceLines += pageDetails.assignedPriceLineCount;
+        ocrDiagnostics.packLines += pageDetails.packLineCount;
+        ocrDiagnostics.assignedPackLines += pageDetails.assignedPackLineCount;
         const medianX = grouped.length ? [...grouped].map((region) => region.x + region.width / 2).sort((a, b) => a - b)[Math.floor(grouped.length / 2)] : (page.viewportSize()?.width ?? 870) / 2;
         const headerBySide = ['left', 'right'].map((side) => {
           const sideRegions = grouped.filter((region) => (region.x + region.width / 2 < medianX) === (side === 'left'));
@@ -1389,6 +1462,7 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
             ocrLines: region.ocrLines,
             minConfidence: config.imageOcr?.minConfidence
           });
+          if (imageMatch.status === 'verified') pageDetails.verifiedProductRegionCount += 1;
           const productName = normalizeProspectProductName(region.name, imageMatch);
           const sourcePageNumber = Math.min(expectedPageCount, pageNumber + side);
           const sourcePage = new URL(pageUrl);
@@ -1416,6 +1490,8 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
             collected.push({ reviewItem: assessment.reviewItem });
           }
         }
+        ocrDiagnostics.verifiedProductRegions += pageDetails.verifiedProductRegionCount;
+        ocrDiagnostics.pageDetails.push(pageDetails);
         if (!pageLinkCount) pageWithNoProductLinks += 1;
         visitedPageCount += 2;
       } catch (error) {
@@ -1447,6 +1523,7 @@ export async function collectProspectOffersFromPage(page, market, configInput = 
     imageOcrAttempted: visitedPageCount / 2,
     imageOcrVerified: offers.filter((offer) => offer.fieldStatus?.imageProduct === 'verified').length,
     imageOcrFailed: failedPageCount / 2,
+    ocrDiagnostics,
     passes: visitedPageCount / 2,
     targetReached: false,
     scrollExhausted: pageTraversalStatus === 'complete',

@@ -28,6 +28,7 @@ import {
   parseUnitPrice,
   parseValidity,
   scoreKaufdaMarketResult,
+  scaleOcrLinesToViewport,
   validateConfig,
   validateOutputDocument
 } from '../src/index.mjs';
@@ -80,6 +81,22 @@ test('Kaufland verwendet Prospektseiten; Netto bleibt im Kachelmodus', () => {
   assert.deepEqual(parsePriceDetails('Gratis für mindestens 10 Euro Einkauf'), {
     currentPrice: null, previousPrice: null, discountAmount: null, type: 'missing', text: 'Gratis'
   });
+});
+
+test('Prospekt-OCR normalisiert Screenshot-Skalierung und ordnet überlappende Zeilen zu', () => {
+  const screenshot = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(screenshot, 0);
+  screenshot.writeUInt32BE(200, 16);
+  screenshot.writeUInt32BE(100, 20);
+  const [line] = scaleOcrLinesToViewport([
+    { text: '2,22 €', confidence: 92, box: { x: 170, y: 20, width: 100, height: 20 } }
+  ], screenshot, { width: 100, height: 50 });
+
+  assert.deepEqual(line.box, { x: 85, y: 10, width: 50, height: 10 });
+  const [region] = assignOcrLinesToRegions([line], [
+    { id: 'page-region', name: 'Kinder Riegel – Link', x: 0, y: 0, width: 100, height: 50 }
+  ]);
+  assert.equal(region.text, '2,22 €');
 });
 
 test('Prospekt-OCR behält Zeilenkonfidenz und trennt Angebotsdaten vom Linklabel', () => {
