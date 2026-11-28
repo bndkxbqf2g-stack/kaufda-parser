@@ -747,7 +747,14 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     && !visiblePack.text
     && ['kg', 'g', 'l', 'ml', 'cl'].includes(unit.unit)
     && /\b(?:je|pro)\s*\d+(?:[,.]\d+)?\b/i.test(packEvidenceText);
-  const pack = canInferPackUnit ? parsePackSize(packInput, { fallbackUnit: unit.unit }) : visiblePack;
+  const canInferSinglePiece = market.inferPackFromJeStueck === true
+    && !visiblePack.text
+    && /\bje\s+stück\b/i.test(packEvidenceText);
+  const pack = canInferPackUnit
+    ? parsePackSize(packInput, { fallbackUnit: unit.unit })
+    : canInferSinglePiece
+      ? parsePackSize('1 Stück')
+      : visiblePack;
   const kaufland = isKauflandMarket(market);
   const kauflandConditions = kaufland ? parseKauflandConditions(text) : {
     loyaltyPrice: null,
@@ -817,7 +824,7 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
     imageProduct: imageProductStatus,
     productDescription: productDescription ? 'visible' : 'missing',
     price: activationRequired || weightUnitUnknown ? 'needs-review' : Number.isFinite(price) ? 'visible' : 'missing',
-    packSize: canInferPackUnit ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
+    packSize: canInferPackUnit || canInferSinglePiece ? 'inferred' : pack.ambiguous ? 'ambiguous' : pack.text && pack.value != null ? 'visible' : 'missing',
     unitPrice: Number.isFinite(unit.amount) ? 'visible' : 'missing',
     validity: validity.status,
     source: validUrl(sourceUrl) ? 'visible' : 'missing'
@@ -851,6 +858,10 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
         type: 'unit-price',
         visibleText: unit.text,
         unit: unit.unit
+      } : canInferSinglePiece ? {
+        type: 'visible-unit',
+        visibleText: packEvidenceText.match(/\bje\s+stück\b/i)?.[0] ?? null,
+        unit: 'stück'
       } : null,
       status: fieldStatus.packSize
     },
@@ -936,7 +947,9 @@ export function assessOffer(raw = {}, market = {}, configInput = {}, fetchedAt =
   // bleiben Zusatzdaten und schließen ein nutzbares Angebot nicht aus.
   // Die Aldi-Kategorie enthält auch lose Ware und variable Gewichte. Ohne
   // eindeutig messbare Packungsgröße ist der Preis nicht planungsbereit.
-  const requiresExactPackForPlanning = !categoryScopeActive || market.interpretationProfile === 'aldi-sued-v1';
+  const requiresExactPackForPlanning = !categoryScopeActive
+    || market.interpretationProfile === 'aldi-sued-v1'
+    || market.requirePackForPlanning === true;
   const packBlocksPlanning = requiresExactPackForPlanning && (!pack.text || pack.value == null || pack.ambiguous);
   const planningReady = Boolean(
     name && Number.isFinite(price) && !packBlocksPlanning && validUrl(sourceUrl) && !activationRequired && !weightUnitUnknown && !explicitWeightBasis

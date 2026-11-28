@@ -32,6 +32,8 @@
       "label": "Lidl Zellingen",
       "store": "Lidl",
       "inferPackUnitFromUnitPrice": true,
+      "inferPackFromJeStueck": true,
+      "requirePackForPlanning": true,
       "foodTerms": [
         "avocado", "cannoli", "cappuccino", "eiscreme", "entenbrust",
         "erdnuss", "garnelen", "gulasch", "hirschbraten", "nutella", "rapsöl",

@@ -700,6 +700,64 @@ test('Lidl leitet fehlende Packungseinheit nur mit explizitem Einheitspreis ab',
   assert.equal(otherResult.offer.evidence.packaging.inferenceSource, null);
 });
 
+test('Lidl-Kategorieangebote ohne eindeutige Packung bleiben sichtbar, aber review-only', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = { ...mergeConfig(), categoryScopeActive: true };
+  const bareHirsch = assessOffer({
+    name: 'Hirschbraten', text: 'Hirschbraten\n2,99 €', priceText: '2,99 €', sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  const packedHirsch = assessOffer({
+    name: 'Hirschbraten',
+    text: 'Hirschbraten\nTiefgefroren. Je 600 g\n13,99 €',
+    productDescription: 'Tiefgefroren. Je 600 g',
+    priceText: '13,99 €',
+    sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  const cucumber = assessOffer({
+    name: 'Bio Gurken',
+    text: 'Bio Gurken\nUrsprung: Spanien Klasse I Je Stück\n0,89 €',
+    productDescription: 'Ursprung: Spanien Klasse I Je Stück',
+    priceText: '0,89 €',
+    sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  const looseZucchini = assessOffer({
+    name: 'Zucchini, lose',
+    text: 'Zucchini, lose\nUrsprung: Spanien/Italien, Klasse I\n1,19 €',
+    productDescription: 'Ursprung: Spanien/Italien, Klasse I',
+    priceText: '1,19 €',
+    sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  const ambiguousPiece = assessOffer({
+    name: 'Romana Salat',
+    text: 'Romana Salat\nSpanien Klasse I Stück\n1,29 €',
+    productDescription: 'Spanien Klasse I Stück',
+    priceText: '1,29 €',
+    sourceUrl: lidl.url
+  }, lidl, categoryConfig);
+  const otherMarket = assessOffer({
+    name: 'Hirschbraten', text: 'Hirschbraten\n2,99 €', priceText: '2,99 €', sourceUrl: edeka.url
+  }, edeka, categoryConfig);
+
+  assert.equal(bareHirsch.state, 'accepted');
+  assert.equal(bareHirsch.offer.pack, null);
+  assert.equal(bareHirsch.offer.planningStatus, 'needs-review');
+  assert.equal(packedHirsch.offer.pack, '600 g');
+  assert.equal(packedHirsch.offer.planningStatus, 'ready');
+  assert.equal(cucumber.offer.pack, '1 Stück');
+  assert.equal(cucumber.offer.fieldStatus.packSize, 'inferred');
+  assert.deepEqual(cucumber.offer.evidence.packaging.inferenceSource, {
+    type: 'visible-unit', visibleText: 'Je Stück', unit: 'stück'
+  });
+  assert.equal(cucumber.offer.planningStatus, 'ready');
+  assert.equal(looseZucchini.offer.pack, null);
+  assert.equal(looseZucchini.offer.planningStatus, 'needs-review');
+  assert.equal(ambiguousPiece.offer.pack, null);
+  assert.equal(ambiguousPiece.offer.planningStatus, 'needs-review');
+  assert.equal(otherMarket.offer.planningStatus, 'ready');
+});
+
 test('KaufDA-Detailfelder werden vollständig und semantisch getrennt übernommen', () => {
   const babybel = assessOffer({
     name: 'Mini Babybel',
