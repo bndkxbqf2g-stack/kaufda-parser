@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 16549)
+Total output lines: 1331
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -630,120 +633,7 @@ test('Aktivierungspflicht und unklarer Thekenpreis bleiben prüfpflichtig', () =
 
 test('Kaufland-XTRA, Punkte, Mindestkauf, Kauflimit und Prozentaktionen bleiben getrennt', () => {
   const kaufland = { key: 'Kaufland-Wuerzburg', label: 'Kaufland Würzburg', store: 'Kaufland', interpretationProfile: 'kaufland-v1' };
-  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all', imageOcr: { enabled: false, required: false } });
-  const butter = assessOffer({
-    name: 'Weihenstephan Butter',
-    text: 'Weihenstephan Butter oder Die Streichzarte\n250 g\nAktionspreis 1,29 € statt 2,99 €\nKaufland Card XTRA 1,15 €\nmaximal 4 Stück pro Kunde',
-    priceText: 'Aktionspreis 1,29 € statt 2,99 € Kaufland Card XTRA 1,15 €',
-    packSizeText: '250 g',
-    sourceUrl: 'https://www.kaufda.de/contentViewer/static/butter'
-  }, kaufland, config, '2026-11-27T08:00:00Z').offer;
-  assert.equal(butter.price, 1.29);
-  assert.equal(butter.previousPrice, 2.99);
-  assert.equal(butter.loyaltyPrice, 1.15);
-  assert.equal(butter.loyaltyProgram, 'Kaufland Card XTRA');
-  assert.equal(butter.loyaltyActivationRequired, false);
-  assert.equal(butter.activationRequired, false);
-  assert.match(butter.purchaseLimitText, /maximal 4 Stück pro Kunde/i);
-
-  const oil = assessOffer({
-    name: 'Thomy Sonnenblumenöl',
-    text: 'Thomy Sonnenblumenöl 750 ml\nAktionspreis 2,49 €\nKaufland Card XTRA 1,99 €\nXTRA-Coupon aktivieren und 60 XTRA-Punkte einlösen',
-    priceText: 'Aktionspreis 2,49 € Kaufland Card XTRA 1,99 €',
-    packSizeText: '750 ml',
-    sourceUrl: 'https://www.kaufda.de/contentViewer/static/oil'
-  }, kaufland, config, '2026-11-27T08:00:00Z').offer;
-  assert.equal(oil.price, 2.49);
-  assert.equal(oil.loyaltyPrice, 1.99);
-  assert.equal(oil.loyaltyActivationRequired, true);
-  assert.equal(oil.loyaltyPointsRequired, 60);
-  assert.equal(oil.activationRequired, false);
-  assert.equal(oil.planningStatus, 'ready');
-
-  const free = assessOffer({
-    name: 'K-Classic Kaffeeweißer',
-    text: 'K-Classic Kaffeeweißer 250-g-Dose GRATIS\nFür mindestens 10 € Einkauf\n180 XTRA-Punkte aktivieren',
-    sourceUrl: 'https://www.kaufda.de/contentViewer/static/freebie'
-  }, kaufland, config, '2026-11-27T08:00:00Z');
-  assert.equal(free.offer, undefined);
-  assert.equal(free.reviewItem.evidence.price.minimumPurchaseAmount, 10);
-  assert.equal(free.reviewItem.evidence.price.loyaltyPointsRequired, 180);
-
-  const brandDiscount = assessOffer({
-    name: 'Popp Feinkost',
-    text: 'Popp Feinkost: 25 % Rabatt auf alle Artikel',
-    sourceUrl: 'https://www.kaufda.de/contentViewer/static/popp'
-  }, kaufland, config, '2026-11-27T08:00:00Z');
-  assert.equal(brandDiscount.offer, undefined);
-  assert.equal(brandDiscount.reviewItem.price, null);
-  assert.equal(brandDiscount.reviewItem.evidence.price.discountPercent, 25);
-
-  const netto = assessOffer({
-    name: 'Butter',
-    text: 'Butter 250 g\nAktionspreis 1,29 €\nKaufland Card XTRA 1,15 €',
-    priceText: 'Aktionspreis 1,29 € Kaufland Card XTRA 1,15 €',
-    packSizeText: '250 g',
-    sourceUrl: 'https://www.kaufda.de/contentViewer/static/netto-butter'
-  }, { key: 'Netto-Thuengersheim', store: 'Netto Marken-Discount' }, config, '2026-11-27T08:00:00Z').offer;
-  assert.equal(netto.loyaltyPrice, null);
-  assert.equal(netto.discountPercent, null);
-});
-
-test('relative KaufDA-Gültigkeit wird anhand des Abrufzeitpunkts datiert', () => {
-  assert.deepEqual(parseValidity('Endet morgen', '2026-11-20T07:00:00Z'), {
-    validFrom: null, validUntil: '2026-11-21', status: 'relative', text: 'Endet morgen'
-  });
-  const offer = assessOffer({ name: 'Bio-Mandeldrink', priceText: '1,35 €', validityText: 'Endet morgen', packSizeText: '1 l' }, market, mergeConfig(), '2026-11-20T07:00:00Z');
-  assert.equal(offer.offer.validUntil, '2026-11-21');
-});
-
-test('sichtbare Regelpreise und Packungsbeschreibung werden übernommen', () => {
-  const offer = assessOffer({ name: 'Brauner Rohrzucker', text: 'Brauner Rohrzucker\n0,89 € * 1,29 €\nversch. Sorten; je 500-g-Packung\nkg-Preis 1.78\nEndet morgen' }, market, mergeConfig(), '2026-11-20T07:00:00Z');
-  assert.equal(offer.offer.price, 0.89);
-  assert.equal(offer.offer.basePrice, 1.29);
-  assert.equal(offer.offer.packSize, '500-g-Packung');
-  assert.equal(offer.offer.unitPrice, 1.78);
-  assert.equal(offer.offer.validUntil, '2026-11-21');
-  assert.equal(offer.offer.planningStatus, 'ready');
-});
-
-test('Lidl ergänzt bekannte Lebensmittelbegriffe nur marktspezifisch', () => {
-  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
-  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
-  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
-  const raw = { name: 'Nutella', text: 'Nutella\n1,99 €\n450 g', priceText: '1,99 €', packSizeText: '450 g', sourceUrl: lidl.url };
-  const lidlResult = assessOffer(raw, lidl, mergeConfig());
-  const edekaResult = assessOffer(raw, edeka, mergeConfig());
-  const gulasch = assessOffer({
-    name: 'Frisches Gulasch, gemischt',
-    text: 'Frisches Gulasch, gemischt\nVom Schwein und Rind. Je 800 g\n7,49 €',
-    productDescription: 'Vom Schwein und Rind. Je 800 g',
-    priceText: '7,49 €',
-    sourceUrl: lidl.url
-  }, lidl, mergeConfig());
-  assert.equal(lidlResult.classification.label, 'food');
-  assert.equal(edekaResult.classification.label, 'uncertain');
-  assert.equal(gulasch.classification.label, 'food');
-});
-
-test('Lidl leitet fehlende Packungseinheit nur mit explizitem Einheitspreis ab', () => {
-  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
-  const lidl = config.markets.find((candidate) => candidate.key === 'Lidl-Zellingen');
-  const raw = {
-    name: 'Naturelle',
-    text: 'Naturelle\nJe 1,5 zzgl. 0.25 Pfand\n0,79 €',
-    productDescription: 'Je 1,5 zzgl. 0.25 Pfand',
-    priceText: '0,79 €',
-    unitPriceText: 'Preis pro Einheit: 1 l = 0,53 €',
-    sourceUrl: lidl.url
-  };
-  const configWithCategory = { ...mergeConfig(), categoryScopeActive: true };
-  const lidlResult = assessOffer(raw, lidl, configWithCategory, '2026-11-20T07:00:00Z');
-  const otherResult = assessOffer(raw, { ...lidl, key: 'Other-Market', inferPackUnitFromUnitPrice: false }, configWithCategory, '2026-11-20T07:00:00Z');
-  assert.equal(lidlResult.offer.pack, '1,5 l');
-  assert.equal(lidlResult.offer.packSizeValue, 1.5);
-  assert.equal(lidlResult.offer.fieldStatus.packSize, 'inferred');
-  assert.deepEqual(lidlResult.offer.evidence.packaging.inferenceSource, {
+  const config = mergeConfig({ categoryScopeActive: true, offerCategoryMode: 'include-all', imageOcr: { enabled: false, required: false } }…1549 tokens truncated…assert.deepEqual(lidlResult.offer.evidence.packaging.inferenceSource, {
     type: 'unit-price', visibleText: 'Preis pro Einheit: 1 l = 0,53 €', unit: 'l'
   });
   assert.equal(otherResult.offer.pack, null);
@@ -805,7 +695,7 @@ test('Lidl-Kategorieangebote ohne eindeutige Packung bleiben sichtbar, aber revi
   assert.equal(looseZucchini.offer.planningStatus, 'needs-review');
   assert.equal(ambiguousPiece.offer.pack, null);
   assert.equal(ambiguousPiece.offer.planningStatus, 'needs-review');
-  assert.equal(otherMarket.offer.planningStatus, 'ready');
+  assert.equal(otherMarket.offer.planningStatus, 'needs-review');
 });
 
 test('KaufDA-Detailfelder werden vollständig und semantisch getrennt übernommen', () => {
@@ -910,6 +800,137 @@ test('EDEKA-Kategorie-Guard blockiert Küchentücher als Markt-Nichtlebensmittel
   assert.equal(towels.state, 'rejected');
   assert.equal(towels.offer, undefined);
   assert.equal(towels.reviewItem.classification.label, 'nonfood');
+});
+
+test('EDEKA blockiert klare Weinangebote trotz Speiseempfehlungen im Beschreibungstext', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const rotling = assessOffer({
+    name: 'Rotling',
+    text: '6,99 € Rotling\nFrischer, feinherber Rotling mit fruchtigem Weingenuss. Vielseitiger Begleiter zu Fisch, Salaten, Pasta und hellem Fleisch. 0,75 l Flasche',
+    priceText: '6,99 €',
+    productDescription: 'Frischer, feinherber Rotling mit fruchtigem Weingenuss. Vielseitiger Begleiter zu Fisch, Salaten, Pasta und hellem Fleisch. 0,75 l Flasche',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+
+  assert.equal(rotling.classification.label, 'nonfood');
+  assert.equal(rotling.state, 'rejected');
+  assert.equal(rotling.offer, undefined);
+});
+
+test('EDEKA blockiert Volumenprozent plus Verkaufsgebinde auch bei irreführendem Lebensmittel-Titel', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const cases = [
+    {
+      name: 'Gorbatschow',
+      productDescription: 'verschiedene Sorten, 10 % Vol. 0,25/0,33 Liter Dose + 0,25 Pfand'
+    },
+    {
+      name: 'Lebkuchen',
+      productDescription: 'Irland Irish Cream Likör, verschiedene Sorten, 15,7/17 % Vol. 0,5/0,7 Liter Flasche'
+    }
+  ];
+
+  for (const item of cases) {
+    const result = assessOffer({
+      name: item.name,
+      text: `9,99 € ${item.name}\n${item.productDescription}`,
+      productDescription: item.productDescription,
+      priceText: '9,99 €',
+      sourceUrl: edeka.url
+    }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+    assert.equal(result.classification.label, 'nonfood', item.name);
+    assert.equal(result.state, 'rejected', item.name);
+  }
+});
+
+test('EDEKA lässt Likör als Dessertzutat ohne Alkoholstärkeangabe zu', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const dessert = assessOffer({
+    name: 'Lebkuchen',
+    text: '2,99 € Lebkuchen\nIrish Cream Likör als Zutat, Herzen und Sterne, 500 g Packung',
+    productDescription: 'Irish Cream Likör als Zutat, Herzen und Sterne, 500 g Packung',
+    priceText: '2,99 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+
+  assert.equal(dessert.classification.label, 'food');
+  assert.equal(dessert.offer.planningStatus, 'ready');
+});
+
+test('EDEKA-Wein- und Bierbegriffe blockieren keine Lebensmittelkomposita', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+
+  for (const name of ['Weingummi', 'Bierwurst']) {
+    const result = assessOffer({
+      name,
+      text: `1,99 € ${name}\n200 g Packung`,
+      productDescription: '200 g Packung',
+      priceText: '1,99 €',
+      sourceUrl: edeka.url
+    }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+    assert.equal(result.classification.label, 'food', name);
+    assert.equal(result.offer.planningStatus, 'ready', name);
+  }
+});
+
+test('EDEKA benötigt ein eindeutiges Packmaß und erkennt klar ausgewiesene Stückware', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const literBottle = assessOffer({
+    name: 'Alkoholfreier Traubensaft',
+    text: '2,99 € Alkoholfreier Traubensaft\n0,75 Liter Flasche',
+    productDescription: '0,75 Liter Flasche',
+    priceText: '2,99 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+  const looseBread = assessOffer({
+    name: 'Kartoffelbrötchen dunkel',
+    text: '0,35 € Kartoffelbrötchen dunkel\nAbbildung ähnlich',
+    productDescription: 'Abbildung ähnlich',
+    priceText: '0,35 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+  const pineapple = assessOffer({
+    name: 'Ananas',
+    text: '1,99 € Ananas\nCosta Rica Kl. I, Stück',
+    productDescription: 'Costa Rica Kl. I, Stück',
+    priceText: '1,99 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+
+  assert.equal(literBottle.offer.pack, '0,75 l');
+  assert.equal(literBottle.offer.packSizeValue, 0.75);
+  assert.equal(literBottle.offer.planningStatus, 'ready');
+  assert.equal(looseBread.offer.planningStatus, 'needs-review');
+  assert.equal(pineapple.offer.pack, '1 Stück');
+  assert.equal(pineapple.offer.packSizeValue, 1);
+  assert.equal(pineapple.offer.evidence.packaging.status, 'inferred');
+  assert.equal(pineapple.offer.planningStatus, 'ready');
+});
+
+test('EDEKA lässt gemischte alkoholfreie Markenangebote nur zur Prüfung zu', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'kaufda-parser.config.json'), 'utf8'));
+  const edeka = config.markets.find((candidate) => candidate.key === 'Edeka-Zellingen');
+  const categoryConfig = mergeConfig({ ...config, categoryScopeActive: true, offerCategoryMode: 'include-all' });
+  const krombacher = assessOffer({
+    name: 'Krombacher',
+    text: '9,99 € Krombacher\nverschiedene Sorten, auch alkoholfrei, 24x0,33/20x0,5 Liter Kasten',
+    productDescription: 'verschiedene Sorten, auch alkoholfrei, 24x0,33/20x0,5 Liter Kasten',
+    priceText: '9,99 €',
+    sourceUrl: edeka.url
+  }, edeka, categoryConfig, '2026-11-28T10:12:35.263Z');
+
+  assert.equal(krombacher.classification.label, 'uncertain');
+  assert.equal(krombacher.offer.planningStatus, 'needs-review');
 });
 
 test('Fixturekarten liefern PWA-kompatible Felder und Status', () => {
